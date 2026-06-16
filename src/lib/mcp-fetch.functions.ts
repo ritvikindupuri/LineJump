@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { checkRateLimit } from "./rate-limit";
 
 export type FetchSource = "json" | "tools/list";
 
@@ -52,12 +51,11 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 8000) {
 }
 
 export const fetchMcpManifest = createServerFn({ method: "POST" })
-  .validator((d: { url: string }) => {
+  .inputValidator((d: { url: string }) => {
     if (!d || typeof d.url !== "string") throw new Error("url required");
     return { url: d.url.trim() };
   })
   .handler(async ({ data }): Promise<FetchManifestResult> => {
-    checkRateLimit("fetch-manifest", 30, 60000);
     const u = validateUrl(data.url);
     const url = u.toString();
 
