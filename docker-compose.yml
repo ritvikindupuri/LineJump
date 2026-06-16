@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  linejump:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+    volumes:
+      - linejump-data:/app/linejump.db
+    restart: unless-stopped
+
+volumes:
+  linejump-data:
