@@ -9,6 +9,7 @@ import {
   TerminalSquare,
   Workflow,
   ArrowRight,
+  Globe,
 } from "lucide-react";
 import {
   parseManifestInput,
@@ -16,6 +17,8 @@ import {
   type ScanReport,
   type RiskSeverity,
 } from "@/lib/mcp-scanner";
+import { useServerFn } from "@tanstack/react-start";
+import { fetchMcpManifest } from "@/lib/mcp-fetch.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,9 +59,13 @@ const severityClasses: Record<RiskSeverity, string> = {
 
 function Index() {
   const [input, setInput] = useState("");
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchedFrom, setFetchedFrom] = useState<string | null>(null);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const fetchManifest = useServerFn(fetchMcpManifest);
 
   const handleScan = () => {
     setError(null);
@@ -72,6 +79,29 @@ function Index() {
       setError(e instanceof Error ? e.message : "Failed to parse input.");
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleFetchAndScan = async () => {
+    if (!url.trim()) return;
+    setError(null);
+    setReport(null);
+    setFetching(true);
+    setFetchedFrom(null);
+    try {
+      const res = await fetchManifest({ data: { url: url.trim() } });
+      setInput(res.raw);
+      setFetchedFrom(
+        res.source === "tools/list"
+          ? `Live tools/list · ${res.url}`
+          : `Manifest · ${res.url}`,
+      );
+      const manifest = parseManifestInput(res.raw);
+      setReport(scanManifest(manifest));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fetch manifest.");
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -100,6 +130,11 @@ function Index() {
       <Scanner
         input={input}
         setInput={setInput}
+        url={url}
+        setUrl={setUrl}
+        onFetchAndScan={handleFetchAndScan}
+        fetching={fetching}
+        fetchedFrom={fetchedFrom}
         onScan={handleScan}
         scanning={scanning}
         error={error}
@@ -130,14 +165,6 @@ function Nav() {
           </a>
           <a href="#scanner" className="hover:text-foreground transition-colors">
             Scanner
-          </a>
-          <a
-            href="https://www.trailofbits.com/"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            Research
           </a>
         </nav>
       </div>
@@ -299,6 +326,11 @@ function Features() {
 function Scanner({
   input,
   setInput,
+  url,
+  setUrl,
+  onFetchAndScan,
+  fetching,
+  fetchedFrom,
   onScan,
   scanning,
   error,
@@ -307,6 +339,11 @@ function Scanner({
 }: {
   input: string;
   setInput: (v: string) => void;
+  url: string;
+  setUrl: (v: string) => void;
+  onFetchAndScan: () => void;
+  fetching: boolean;
+  fetchedFrom: string | null;
   onScan: () => void;
   scanning: boolean;
   error: string | null;
@@ -331,10 +368,52 @@ function Scanner({
             Audit any manifest.
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground">
-            Paste a server manifest, the result of an MCP{" "}
+            Point Linejump at a live MCP endpoint and we'll fetch its manifest
+            or call{" "}
             <code className="rounded bg-secondary px-1.5 py-0.5 text-[13px]">tools/list</code>{" "}
-            call, or a single tool definition.
+            for you — or paste a manifest by hand.
           </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, ease }}
+          className="mt-8 rounded-2xl border border-border bg-card p-2"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-1 items-center gap-2 px-3">
+              <Globe className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+              <input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onFetchAndScan();
+                }}
+                spellCheck={false}
+                placeholder="https://your-mcp-server.example.com/mcp"
+                className="h-11 w-full bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
+              />
+            </div>
+            <button
+              onClick={onFetchAndScan}
+              disabled={fetching || !url.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[13px] font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40"
+            >
+              {fetching ? "Fetching…" : "Fetch & scan"}
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+          </div>
+          {fetchedFrom ? (
+            <div className="px-3 pb-2 pt-1 text-[12px] text-muted-foreground">
+              {fetchedFrom}
+            </div>
+          ) : (
+            <div className="px-3 pb-2 pt-1 text-[12px] text-muted-foreground">
+              GET first, then MCP <code className="rounded bg-secondary px-1 py-0.5 text-[11px]">tools/list</code> over JSON-RPC. http(s) only.
+            </div>
+          )}
         </motion.div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-[1.05fr_1fr]">
