@@ -260,9 +260,8 @@ function DocsPage() {
               <Section title="Server Catalog" id="catalog">
                 <div className="prose-sm max-w-none text-muted-foreground space-y-4">
                   <p>
-                    The <Link to="/catalog" className="text-[#6C5CE7] hover:underline">Server Catalog</Link> is a community-driven
-                    registry of known MCP servers with published scan results. Submit your own scans to help build a shared
-                    knowledge base of server trustworthiness.
+                    A shared registry of audited MCP servers with signed
+                    fingerprints and version history. Coming soon.
                   </p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Browse seed entries for popular servers (Filesystem Bridge, GitHub, PostgreSQL)</li>
