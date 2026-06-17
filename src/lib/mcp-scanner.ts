@@ -277,7 +277,13 @@ export function scanManifest(manifest: McpManifest): ScanReport {
 
   for (const t of tools) {
     findings.push(...scanToolName(t.name));
-    findings.push(...scanText(lower(t.description) ? (t.description as string) : "", t.name, "Tool description"));
+    findings.push(
+      ...scanText(
+        lower(t.description) ? (t.description as string) : "",
+        t.name,
+        "Tool description",
+      ),
+    );
     // Schema descriptions
     try {
       const schemaJson = JSON.stringify(t.inputSchema ?? {});
@@ -318,9 +324,7 @@ export function scanManifest(manifest: McpManifest): ScanReport {
     serverName: typeof manifest.name === "string" ? manifest.name : "Unnamed MCP server",
     toolCount: tools.length,
     scannedAt: new Date().toISOString(),
-    findings: deduped.sort(
-      (a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity],
-    ),
+    findings: deduped.sort((a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity]),
     score,
   };
 }
@@ -343,7 +347,11 @@ export function parseManifestInput(raw: string): McpManifest {
     return { tools: parsed as McpTool[] };
   }
   if (Array.isArray(obj.tools)) return obj as McpManifest;
-  if (obj.result && typeof obj.result === "object" && Array.isArray((obj.result as { tools?: unknown }).tools)) {
+  if (
+    obj.result &&
+    typeof obj.result === "object" &&
+    Array.isArray((obj.result as { tools?: unknown }).tools)
+  ) {
     return { ...(obj.result as McpManifest) };
   }
   // Single tool object

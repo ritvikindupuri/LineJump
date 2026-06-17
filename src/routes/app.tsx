@@ -1,13 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  ArrowLeft,
-  ScanLine,
-  ShieldCheck,
-  AlertTriangle,
-  Globe,
-} from "lucide-react";
+import { ArrowLeft, ScanLine, ShieldCheck, AlertTriangle, Globe } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   parseManifestInput,
@@ -77,9 +71,7 @@ function ScannerPage() {
       const res = await fetchManifest({ data: { url: url.trim() } });
       setInput(res.raw);
       setFetchedFrom(
-        res.source === "tools/list"
-          ? `Live tools/list · ${res.url}`
-          : `Manifest · ${res.url}`,
+        res.source === "tools/list" ? `Live tools/list · ${res.url}` : `Manifest · ${res.url}`,
       );
       setReport(scanManifest(parseManifestInput(res.raw)));
     } catch (e) {
@@ -108,9 +100,7 @@ function ScannerPage() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center gap-2">
             <LinejumpLogo size={22} className="text-foreground" />
-            <span className="text-[15px] font-medium tracking-tight">
-              Linejump
-            </span>
+            <span className="text-[15px] font-medium tracking-tight">Linejump</span>
           </Link>
           <Link
             to="/"
@@ -137,9 +127,8 @@ function ScannerPage() {
             Audit a manifest.
           </h1>
           <p className="mt-4 text-[16px] leading-[1.6] text-muted-foreground">
-            Point Linejump at a live MCP endpoint or paste a manifest. Every
-            scan runs the same forensic rules and produces an evidence-backed
-            report — no data leaves this session.
+            Point Linejump at a live MCP endpoint or paste a manifest. Every scan runs the same
+            forensic rules and produces an evidence-backed report — no data leaves this session.
           </p>
         </motion.div>
 
@@ -151,10 +140,7 @@ function ScannerPage() {
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex flex-1 items-center gap-2 px-3">
-              <Globe
-                className="h-4 w-4 text-muted-foreground"
-                strokeWidth={1.5}
-              />
+              <Globe className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -175,8 +161,7 @@ function ScannerPage() {
             </button>
           </div>
           <div className="px-3 pb-2 pt-1 text-[12px] text-muted-foreground">
-            {fetchedFrom ??
-              "GET first, then MCP tools/list over JSON-RPC. http(s) only."}
+            {fetchedFrom ?? "GET first, then MCP tools/list over JSON-RPC. http(s) only."}
           </div>
         </motion.div>
 
@@ -233,10 +218,7 @@ function ScannerPage() {
                   exit={{ opacity: 0 }}
                   className="flex h-full min-h-[380px] flex-col items-center justify-center text-center"
                 >
-                  <AlertTriangle
-                    className="h-6 w-6 text-destructive"
-                    strokeWidth={1.5}
-                  />
+                  <AlertTriangle className="h-6 w-6 text-destructive" strokeWidth={1.5} />
                   <p className="mt-3 text-[14px] text-foreground">{error}</p>
                 </motion.div>
               ) : report && counts ? (
@@ -257,10 +239,7 @@ function ScannerPage() {
                   exit={{ opacity: 0 }}
                   className="flex h-full min-h-[380px] flex-col items-center justify-center text-center"
                 >
-                  <ShieldCheck
-                    className="h-7 w-7 text-muted-foreground"
-                    strokeWidth={1.25}
-                  />
+                  <ShieldCheck className="h-7 w-7 text-muted-foreground" strokeWidth={1.25} />
                   <p className="mt-4 text-[14px] text-muted-foreground">
                     Your report appears here.
                   </p>
@@ -296,9 +275,7 @@ function ReportView({
           </div>
         </div>
         <div className="rounded-full border border-border bg-background px-4 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Safety
-          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Safety</div>
           <div className="text-[20px] font-semibold tracking-tight">
             {report.score}
             <span className="text-[13px] text-muted-foreground">/100</span>
@@ -322,16 +299,10 @@ function ReportView({
       <div className="mt-6 max-h-[380px] space-y-3 overflow-y-auto pr-1">
         {report.findings.length === 0 ? (
           <div className="rounded-xl border border-border bg-background/50 p-6 text-center">
-            <ShieldCheck
-              className="mx-auto h-6 w-6 text-[oklch(0.6_0.12_150)]"
-              strokeWidth={1.5}
-            />
-            <p className="mt-2 text-[14px] text-foreground">
-              No risks detected.
-            </p>
+            <ShieldCheck className="mx-auto h-6 w-6 text-[oklch(0.6_0.12_150)]" strokeWidth={1.5} />
+            <p className="mt-2 text-[14px] text-foreground">No risks detected.</p>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Static checks passed. Continue to review dynamic behavior at
-              runtime.
+              Static checks passed. Continue to review dynamic behavior at runtime.
             </p>
           </div>
         ) : (
@@ -349,21 +320,15 @@ function ReportView({
                 >
                   {f.severity}
                 </span>
-                <span className="text-[11.5px] text-muted-foreground">
-                  {f.category}
-                </span>
+                <span className="text-[11.5px] text-muted-foreground">{f.category}</span>
                 {f.toolName ? (
                   <span className="ml-auto rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-secondary-foreground">
                     {f.toolName}
                   </span>
                 ) : null}
               </div>
-              <div className="mt-2 text-[14px] font-medium text-foreground">
-                {f.title}
-              </div>
-              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                {f.detail}
-              </p>
+              <div className="mt-2 text-[14px] font-medium text-foreground">{f.title}</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{f.detail}</p>
               {f.evidence ? (
                 <pre className="mt-2 overflow-x-auto rounded bg-secondary/60 p-2 font-mono text-[11.5px] text-secondary-foreground">
                   {f.evidence}

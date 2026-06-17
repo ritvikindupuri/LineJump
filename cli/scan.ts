@@ -13,7 +13,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { scanManifest, parseManifestInput, type ScanReport } from "../src/lib/mcp-scanner";
-import { evaluateCiCheck, generateCiCheckMarkdown, DEFAULT_CI_CONFIG, type CiCheckConfig } from "../src/lib/ci-check";
+import {
+  evaluateCiCheck,
+  generateCiCheckMarkdown,
+  DEFAULT_CI_CONFIG,
+  type CiCheckConfig,
+} from "../src/lib/ci-check";
 
 interface CliOptions {
   json: boolean;
@@ -31,7 +36,8 @@ function parseArgs(args: string[]): { fileOrUrl: string; options: CliOptions } {
   for (const arg of args) {
     if (arg === "--json") options.json = true;
     else if (arg === "--ci") options.ci = true;
-    else if (arg.startsWith("--max-critical=")) options.maxCritical = parseInt(arg.split("=")[1], 10);
+    else if (arg.startsWith("--max-critical="))
+      options.maxCritical = parseInt(arg.split("=")[1], 10);
     else if (arg.startsWith("--max-high=")) options.maxHigh = parseInt(arg.split("=")[1], 10);
     else if (arg.startsWith("--max-medium=")) options.maxMedium = parseInt(arg.split("=")[1], 10);
     else if (arg.startsWith("--min-score=")) options.minScore = parseInt(arg.split("=")[1], 10);
@@ -60,17 +66,21 @@ function formatScore(score: number): string {
 
 function formatSeverity(sev: string): string {
   const colors: Record<string, string> = {
-    critical: "\x1b[31m", high: "\x1b[33m", medium: "\x1b[93m", low: "\x1b[34m", info: "\x1b[90m",
+    critical: "\x1b[31m",
+    high: "\x1b[33m",
+    medium: "\x1b[93m",
+    low: "\x1b[34m",
+    info: "\x1b[90m",
   };
   const reset = "\x1b[0m";
   return `${colors[sev] || ""}${sev}${reset}`;
 }
 
 function printReport(report: ScanReport): void {
-  const critical = report.findings.filter(f => f.severity === "critical").length;
-  const high = report.findings.filter(f => f.severity === "high").length;
-  const medium = report.findings.filter(f => f.severity === "medium").length;
-  const low = report.findings.filter(f => f.severity === "low").length;
+  const critical = report.findings.filter((f) => f.severity === "critical").length;
+  const high = report.findings.filter((f) => f.severity === "high").length;
+  const medium = report.findings.filter((f) => f.severity === "medium").length;
+  const low = report.findings.filter((f) => f.severity === "low").length;
 
   console.log(`\n  ${"=".repeat(54)}`);
   console.log(`  LINEJUMP — MCP Server Security Scan`);
@@ -78,7 +88,9 @@ function printReport(report: ScanReport): void {
   console.log(`  Server:    ${report.serverName}`);
   console.log(`  Tools:     ${report.toolCount}`);
   console.log(`  Score:     ${formatScore(report.score)}`);
-  console.log(`  Findings:  ${report.findings.length} total (C:${critical} H:${high} M:${medium} L:${low})`);
+  console.log(
+    `  Findings:  ${report.findings.length} total (C:${critical} H:${high} M:${medium} L:${low})`,
+  );
   console.log(`  ${"=".repeat(54)}\n`);
 
   if (report.findings.length === 0) {
@@ -90,7 +102,9 @@ function printReport(report: ScanReport): void {
     const sev = formatSeverity(f.severity);
     const tool = f.toolName ? `\x1b[90m[${f.toolName}]\x1b[0m ` : "";
     console.log(`  ${sev}  ${tool}${f.title}`);
-    console.log(`       ${f.category} — ${f.detail.substring(0, 120)}${f.detail.length > 120 ? "…" : ""}`);
+    console.log(
+      `       ${f.category} — ${f.detail.substring(0, 120)}${f.detail.length > 120 ? "…" : ""}`,
+    );
     if (f.evidence) {
       console.log(`       \x1b[90mEvidence: ${f.evidence}\x1b[0m`);
     }
