@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ScanLine, ShieldCheck, AlertTriangle, Globe } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,6 +10,8 @@ import {
   type RiskSeverity,
 } from "@/lib/mcp-scanner";
 import { fetchMcpManifest } from "@/lib/mcp-fetch.functions";
+import { fetchPolicy } from "@/lib/policy.functions";
+import { generateSignedReport } from "@/lib/attestation.functions";
 import { LinejumpLogo } from "@/components/linejump-logo";
 
 export const Route = createFileRoute("/app")({
@@ -45,14 +47,29 @@ function ScannerPage() {
   const [report, setReport] = useState<ScanReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const fetchManifest = useServerFn(fetchMcpManifest);
+  const [policy, setPolicy] = useState<unknown>(null);
+  const [attestation, setAttestation] = useState<{ signatureData: unknown; scanId: string } | null>(
+    null,
+  );
 
-  const handleScan = () => {
+  const fetchManifest = useServerFn(fetchMcpManifest);
+  const fetchPolicyData = useServerFn(fetchPolicy);
+  const signReportFn = useServerFn(generateSignedReport);
+
+  useEffect(() => {
+    fetchPolicyData().then(setPolicy).catch(console.error);
+  }, [fetchPolicyData]);
+
+  const handleScan = async () => {
     setError(null);
     setScanning(true);
+    setAttestation(null);
     try {
       const manifest = parseManifestInput(input);
-      setReport(scanManifest(manifest));
+      const newReport = scanManifest(manifest, policy || {});
+      setReport(newReport);
+      const res = await signReportFn({ data: { report: newReport, manifest, url: url || null } });
+      setAttestation(res);
     } catch (e) {
       setReport(null);
       setError(e instanceof Error ? e.message : "Failed to parse input.");
@@ -65,6 +82,7 @@ function ScannerPage() {
     if (!url.trim()) return;
     setError(null);
     setReport(null);
+    setAttestation(null);
     setFetching(true);
     setFetchedFrom(null);
     try {
@@ -73,12 +91,47 @@ function ScannerPage() {
       setFetchedFrom(
         res.source === "tools/list" ? `Live tools/list · ${res.url}` : `Manifest · ${res.url}`,
       );
-      setReport(scanManifest(parseManifestInput(res.raw)));
+      const manifest = parseManifestInput(res.raw);
+      const newReport = scanManifest(manifest, policy || {});
+      setReport(newReport);
+      const sigRes = await signReportFn({ data: { report: newReport, manifest, url: url.trim() } });
+      setAttestation(sigRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch manifest.");
     } finally {
       setFetching(false);
     }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!report || !attestation) return;
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text("Linejump Security Attestation", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Server: ${report.serverName}`, 14, 32);
+    doc.text(`Scan ID: ${attestation.scanId}`, 14, 38);
+    doc.text(`Score: ${report.score}/100`, 14, 44);
+    doc.text(`Findings: ${report.findings.length}`, 14, 50);
+
+    doc.setFontSize(14);
+    doc.text("Findings", 14, 60);
+    doc.setFontSize(10);
+    let y = 68;
+    for (const f of report.findings.slice(0, 20)) {
+      doc.text(`[${f.severity.toUpperCase()}] ${f.title}`, 14, y);
+      y += 6;
+      const splitDetail = doc.splitTextToSize(f.detail, 180);
+      doc.text(splitDetail, 14, y);
+      y += splitDetail.length * 5 + 4;
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+
+    doc.save(`linejump-attestation-${attestation.scanId}.pdf`);
   };
 
   const counts = useMemo(() => {
@@ -102,13 +155,27 @@ function ScannerPage() {
             <LinejumpLogo size={22} className="text-foreground" />
             <span className="text-[15px] font-medium tracking-tight">Linejump</span>
           </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to overview
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/history"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              History
+            </Link>
+            <Link
+              to="/policy"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Policy
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -230,6 +297,22 @@ function ScannerPage() {
                   transition={{ duration: 0.5, ease }}
                 >
                   <ReportView report={report} counts={counts} />
+                  {attestation && (
+                    <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-secondary/30 p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[13px] font-medium">Signed Attestation Available</div>
+                        <button
+                          onClick={handleDownloadPDF}
+                          className="text-[12px] underline text-primary"
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate font-mono">
+                        ID: {attestation.scanId}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div

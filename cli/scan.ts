@@ -121,26 +121,46 @@ async function main() {
   try {
     const raw = await readInput(fileOrUrl);
     const manifest = parseManifestInput(raw);
-    const report = scanManifest(manifest);
+
+    let policy = {};
+    try {
+      const dbMod = await import("../src/lib/db.js");
+      const p = dbMod.getPolicy("default_org");
+      if (p) policy = p as Record<string, unknown>;
+    } catch {
+      try {
+        const dbMod = await import("../src/lib/db.ts");
+        const p = dbMod.getPolicy("default_org");
+        if (p) policy = p as Record<string, unknown>;
+      } catch {
+        // ignore
+      }
+    }
+    const report = scanManifest(manifest, policy);
 
     if (options.json) {
       console.log(JSON.stringify(report, null, 2));
       return;
     }
 
+    const ciConfig: CiCheckConfig = {};
+    if (options.maxCritical !== undefined) ciConfig.maxCritical = options.maxCritical;
+    if (options.maxHigh !== undefined) ciConfig.maxHigh = options.maxHigh;
+    if (options.maxMedium !== undefined) ciConfig.maxMedium = options.maxMedium;
+    if (options.minScore !== undefined) ciConfig.minScore = options.minScore;
+    const result = evaluateCiCheck(report.score, report.findings, ciConfig);
+
     if (options.ci) {
-      const ciConfig: CiCheckConfig = {};
-      if (options.maxCritical !== undefined) ciConfig.maxCritical = options.maxCritical;
-      if (options.maxHigh !== undefined) ciConfig.maxHigh = options.maxHigh;
-      if (options.maxMedium !== undefined) ciConfig.maxMedium = options.maxMedium;
-      if (options.minScore !== undefined) ciConfig.minScore = options.minScore;
-      const result = evaluateCiCheck(report.score, report.findings, ciConfig);
       console.log(generateCiCheckMarkdown(result));
       process.exit(result.passed ? 0 : 1);
-      return;
     }
 
     printReport(report);
+
+    if (!result.passed) {
+      console.error(`\n\x1b[31mScan failed threshold constraints.\x1b[0m`);
+      process.exit(1);
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`\x1b[31mError:\x1b[0m ${msg}`);
