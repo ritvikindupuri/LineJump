@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, ScanLine, ShieldCheck, AlertTriangle, Globe } from "lucide-react";
+import { ArrowLeft, ScanLine, ShieldCheck, AlertTriangle, Globe, Download, Info } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   parseManifestInput,
@@ -12,7 +12,15 @@ import {
 import { fetchMcpManifest } from "@/lib/mcp-fetch.functions";
 import { fetchPolicy } from "@/lib/policy.functions";
 import { generateSignedReport } from "@/lib/attestation.functions";
+import { generateSarif } from "@/lib/sarif";
 import { LinejumpLogo } from "@/components/linejump-logo";
+import { AtlasMap } from "@/components/atlas-map";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -108,7 +116,7 @@ function ScannerPage() {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
     doc.setFontSize(22);
-    doc.text("Linejump Security Attestation", 14, 22);
+    doc.text("Linejump Security Report", 14, 22);
     doc.setFontSize(11);
     doc.text(`Server: ${report.serverName}`, 14, 32);
     doc.text(`Scan ID: ${attestation.scanId}`, 14, 38);
@@ -131,7 +139,20 @@ function ScannerPage() {
       }
     }
 
-    doc.save(`linejump-attestation-${attestation.scanId}.pdf`);
+    doc.save(`linejump-report-${attestation.scanId}.pdf`);
+  };
+
+  const handleDownloadSarif = () => {
+    if (!report || !attestation) return;
+    const blob = new Blob([generateSarif(report, url || "linejump://manifest")], {
+      type: "application/sarif+json",
+    });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `linejump-report-${attestation.scanId}.sarif.json`;
+    a.click();
+    URL.revokeObjectURL(href);
   };
 
   const counts = useMemo(() => {
@@ -296,23 +317,27 @@ function ScannerPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.5, ease }}
                 >
-                  <ReportView report={report} counts={counts} />
                   {attestation && (
-                    <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-secondary/30 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[13px] font-medium">Signed Attestation Available</div>
-                        <button
-                          onClick={handleDownloadPDF}
-                          className="text-[12px] underline text-primary"
-                        >
-                          Download PDF
-                        </button>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground truncate font-mono">
-                        ID: {attestation.scanId}
-                      </div>
+                    <div className="mb-4 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDownloadSarif}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary/60"
+                      >
+                        <Download className="h-3.5 w-3.5" strokeWidth={2} />
+                        Download SARIF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadPDF}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-secondary/60"
+                      >
+                        <Download className="h-3.5 w-3.5" strokeWidth={2} />
+                        Download PDF
+                      </button>
                     </div>
                   )}
+                  <ReportView report={report} counts={counts} />
                 </motion.div>
               ) : (
                 <motion.div
@@ -356,13 +381,44 @@ function ReportView({
             {report.findings.length} finding
             {report.findings.length === 1 ? "" : "s"}
           </div>
+          {report.coverage ? (
+            <div className="mt-1 font-mono text-[10.5px] text-muted-foreground">
+              engine {report.engineVersion} · {report.coverage.textFragmentsScanned} text fields ·{" "}
+              {report.coverage.schemaFieldsScanned} schema fields
+            </div>
+          ) : null}
         </div>
         <div className="rounded-full border border-border bg-background px-4 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Safety</div>
-          <div className="text-[20px] font-semibold tracking-tight">
-            {report.score}
-            <span className="text-[13px] text-muted-foreground">/100</span>
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="group text-right outline-none"
+                  aria-label="What does the safety score mean?"
+                >
+                  <div className="flex items-center justify-end gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Safety
+                    <Info className="h-3 w-3 opacity-50 transition-opacity group-hover:opacity-100" />
+                  </div>
+                  <div className="text-[20px] font-semibold tracking-tight">
+                    {report.score}
+                    <span className="text-[13px] text-muted-foreground">/100</span>
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="left"
+                className="max-w-[240px] border border-border bg-popover px-3 py-2.5 text-popover-foreground"
+              >
+                <p className="text-[12px] font-medium text-foreground">Safety score</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  A 0–100 rating of manifest risk. Higher is safer. Each unique rule hit reduces
+                  the score based on severity and confidence. 100 means no findings were detected.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -378,6 +434,8 @@ function ReportView({
           ) : null,
         )}
       </div>
+
+      <AtlasMap findings={report.findings} />
 
       <div className="mt-6 max-h-[380px] space-y-3 overflow-y-auto pr-1">
         {report.findings.length === 0 ? (
@@ -412,6 +470,13 @@ function ReportView({
               </div>
               <div className="mt-2 text-[14px] font-medium text-foreground">{f.title}</div>
               <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{f.detail}</p>
+              {f.ruleId ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10.5px] text-muted-foreground">
+                  <span className="rounded bg-secondary/80 px-1.5 py-0.5 font-mono">{f.ruleId}</span>
+                  {f.confidence ? <span>{f.confidence} confidence</span> : null}
+                  {f.location ? <span className="truncate">{f.location}</span> : null}
+                </div>
+              ) : null}
               {f.evidence ? (
                 <pre className="mt-2 overflow-x-auto rounded bg-secondary/60 p-2 font-mono text-[11.5px] text-secondary-foreground">
                   {f.evidence}

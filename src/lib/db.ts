@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { DEFAULT_SCANNER_POLICY } from "./default-policy";
 
 export const db = new Database("linejump.sqlite");
 
@@ -29,13 +30,7 @@ db.exec(`
 const orgExists = db.prepare(`SELECT id FROM orgs WHERE id = 'default_org'`).get();
 if (!orgExists) {
   db.prepare(`INSERT INTO orgs (id, name) VALUES ('default_org', 'Default Organization')`).run();
-  const defaultPolicy = JSON.stringify({
-    disabledRules: [],
-    customRegexes: [],
-    severityOverrides: {},
-    blockedCapabilities: [],
-    requireApproval: false,
-  });
+  const defaultPolicy = JSON.stringify(DEFAULT_SCANNER_POLICY);
   db.prepare(`INSERT INTO policies (org_id, config_json) VALUES ('default_org', ?)`).run(
     defaultPolicy,
   );

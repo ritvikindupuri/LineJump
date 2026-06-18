@@ -1,61 +1,166 @@
-#!/usr/bin/env bun
+#!/usr/bin/env npx tsx
 /**
  * Linejump CLI — MCP Server Security Scanner
- *
- * Usage:
- *   bun run cli scan ./manifest.json
- *   bun run cli scan https://example.com/manifest.json
- *   bun run cli scan ./manifest.json --max-critical=0 --max-high=1 --min-score=60
- *   bun run cli scan ./manifest.json --json    # output JSON
- *   bun run cli scan ./manifest.json --ci      # CI-friendly markdown output
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { scanManifest, parseManifestInput, type ScanReport } from "../src/lib/mcp-scanner";
+import { scanManifest, parseManifestInput, mergePolicy, type ScanReport } from "../src/lib/mcp-scanner";
+import type { ScannerPolicy } from "../src/lib/mcp-scanner";
 import {
   evaluateCiCheck,
   generateCiCheckMarkdown,
-  DEFAULT_CI_CONFIG,
   type CiCheckConfig,
 } from "../src/lib/ci-check";
+import { generateSarif } from "../src/lib/sarif";
+import {
+  fetchToolsListStdio,
+  loadMcpConfig,
+  parseStdioCommand,
+  resolveMcpServer,
+} from "../src/lib/mcp-stdio";
 
 interface CliOptions {
   json: boolean;
   ci: boolean;
+  sarif?: string;
+  stdio?: string;
+  mcpConfig?: string;
+  server?: string;
+  policyFile?: string;
   maxCritical?: number;
   maxHigh?: number;
   maxMedium?: number;
   minScore?: number;
 }
 
-function parseArgs(args: string[]): { fileOrUrl: string; options: CliOptions } {
-  const options: CliOptions = { json: false, ci: false };
-  let fileOrUrl = "";
+function printHelp(): void {
+  console.log(`
+Linejump — MCP manifest security scanner
 
-  for (const arg of args) {
-    if (arg === "--json") options.json = true;
-    else if (arg === "--ci") options.ci = true;
-    else if (arg.startsWith("--max-critical="))
-      options.maxCritical = parseInt(arg.split("=")[1], 10);
-    else if (arg.startsWith("--max-high=")) options.maxHigh = parseInt(arg.split("=")[1], 10);
-    else if (arg.startsWith("--max-medium=")) options.maxMedium = parseInt(arg.split("=")[1], 10);
-    else if (arg.startsWith("--min-score=")) options.minScore = parseInt(arg.split("=")[1], 10);
-    else if (!arg.startsWith("--") && !fileOrUrl) fileOrUrl = arg;
-  }
+Usage:
+  npx tsx cli/scan.ts <file|url|-> [options]
+  npx tsx cli/scan.ts --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp"
+  npx tsx cli/scan.ts --mcp-config ~/.cursor/mcp.json --server filesystem
 
-  if (!fileOrUrl) throw new Error("Usage: linejump scan <file-or-url> [options]");
+Inputs:
+  ./manifest.json          Local JSON manifest or tools/list response
+  https://host/mcp         Remote MCP HTTP endpoint
+  -                        Read manifest JSON from stdin
 
-  return { fileOrUrl, options };
+Options:
+  --stdio <command>        Spawn local MCP server over stdio and scan tools/list
+  --mcp-config <path>      MCP config JSON (Cursor / Claude Desktop style)
+  --server <name>          Server name inside --mcp-config (required with --mcp-config)
+  --policy <path>          Optional policy JSON overlay
+  --json                   Output full JSON report
+  --sarif [file]           Write SARIF 2.1.0 (stdout if no file given)
+  --ci                     CI-friendly markdown + exit 1 on threshold failure
+  --max-critical=<n>       CI threshold (default 0)
+  --max-high=<n>           CI threshold (default 0)
+  --max-medium=<n>         CI threshold (default 100)
+  --min-score=<n>          CI threshold (default 50)
+  --help                   Show this help
+
+Examples:
+  npx tsx cli/scan.ts ./tools-list.json
+  cat manifest.json | npx tsx cli/scan.ts -
+  npx tsx cli/scan.ts --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp"
+  npx tsx cli/scan.ts --mcp-config ./mcp.json --server my-server --ci
+`);
 }
 
-async function readInput(fileOrUrl: string): Promise<string> {
-  if (fileOrUrl.startsWith("http://") || fileOrUrl.startsWith("https://")) {
-    const res = await fetch(fileOrUrl);
+function parseArgs(args: string[]): { target?: string; options: CliOptions } {
+  const options: CliOptions = { json: false, ci: false };
+  let target: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--help" || arg === "-h") {
+      printHelp();
+      process.exit(0);
+    }     else if (arg === "--json") options.json = true;
+    else if (arg === "--ci") options.ci = true;
+    else if (arg === "--sarif") {
+      const next = args[i + 1];
+      options.sarif = next && !next.startsWith("--") ? args[++i] : "-";
+    }
+    else if (arg === "--stdio") options.stdio = args[++i];
+    else if (arg === "--mcp-config") options.mcpConfig = args[++i];
+    else if (arg === "--server") options.server = args[++i];
+    else if (arg === "--policy") options.policyFile = args[++i];
+    else if (arg.startsWith("--max-critical="))
+      options.maxCritical = parseInt(arg.split("=")[1]!, 10);
+    else if (arg.startsWith("--max-high=")) options.maxHigh = parseInt(arg.split("=")[1]!, 10);
+    else if (arg.startsWith("--max-medium="))
+      options.maxMedium = parseInt(arg.split("=")[1]!, 10);
+    else if (arg.startsWith("--min-score=")) options.minScore = parseInt(arg.split("=")[1]!, 10);
+    else if (!arg.startsWith("--") && !target) target = arg;
+  }
+
+  if (!target && !options.stdio && !options.mcpConfig) {
+    printHelp();
+    throw new Error("Provide a manifest file, URL, stdin (-), --stdio, or --mcp-config.");
+  }
+  if (options.mcpConfig && !options.server) {
+    throw new Error("--server is required when using --mcp-config.");
+  }
+
+  return { target, options };
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  const raw = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!raw) throw new Error("No input on stdin.");
+  return raw;
+}
+
+async function loadPolicy(options: CliOptions): Promise<ScannerPolicy> {
+  let userPolicy: ScannerPolicy = {};
+
+  if (options.policyFile) {
+    userPolicy = JSON.parse(fs.readFileSync(path.resolve(options.policyFile), "utf-8"));
+  } else {
+    try {
+      const dbMod = await import("../src/lib/db.ts");
+      const p = dbMod.getPolicy("default_org");
+      if (p) userPolicy = p as ScannerPolicy;
+    } catch {
+      // no local db — defaults only
+    }
+  }
+
+  return mergePolicy(userPolicy);
+}
+
+async function resolveManifest(
+  target: string | undefined,
+  options: CliOptions,
+): Promise<string> {
+  if (options.mcpConfig && options.server) {
+    const config = loadMcpConfig(options.mcpConfig);
+    const server = resolveMcpServer(config, options.server);
+    return fetchToolsListStdio(server.command, server.args ?? [], server.env ?? {});
+  }
+
+  if (options.stdio) {
+    const { command, args } = parseStdioCommand(options.stdio);
+    return fetchToolsListStdio(command, args);
+  }
+
+  if (target === "-" || target === undefined) {
+    return readStdin();
+  }
+
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    const res = await fetch(target);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.text();
   }
-  return fs.readFileSync(path.resolve(fileOrUrl), "utf-8");
+
+  return fs.readFileSync(path.resolve(target), "utf-8");
 }
 
 function formatScore(score: number): string {
@@ -72,8 +177,7 @@ function formatSeverity(sev: string): string {
     low: "\x1b[34m",
     info: "\x1b[90m",
   };
-  const reset = "\x1b[0m";
-  return `${colors[sev] || ""}${sev}${reset}`;
+  return `${colors[sev] || ""}${sev}\x1b[0m`;
 }
 
 function printReport(report: ScanReport): void {
@@ -84,6 +188,7 @@ function printReport(report: ScanReport): void {
 
   console.log(`\n  ${"=".repeat(54)}`);
   console.log(`  LINEJUMP — MCP Server Security Scan`);
+  console.log(`  Engine:    ${report.engineVersion}`);
   console.log(`  ${"=".repeat(54)}`);
   console.log(`  Server:    ${report.serverName}`);
   console.log(`  Tools:     ${report.toolCount}`);
@@ -101,7 +206,8 @@ function printReport(report: ScanReport): void {
   for (const f of report.findings) {
     const sev = formatSeverity(f.severity);
     const tool = f.toolName ? `\x1b[90m[${f.toolName}]\x1b[0m ` : "";
-    console.log(`  ${sev}  ${tool}${f.title}`);
+    const rule = f.ruleId ? `\x1b[90m(${f.ruleId})\x1b[0m ` : "";
+    console.log(`  ${sev}  ${tool}${rule}${f.title}`);
     console.log(
       `       ${f.category} — ${f.detail.substring(0, 120)}${f.detail.length > 120 ? "…" : ""}`,
     );
@@ -115,31 +221,27 @@ function printReport(report: ScanReport): void {
 async function main() {
   const raw = process.argv.slice(2);
   if (raw[0] === "scan") raw.shift();
-  const args = raw;
-  const { fileOrUrl, options } = parseArgs(args);
+  const { target, options } = parseArgs(raw);
 
   try {
-    const raw = await readInput(fileOrUrl);
-    const manifest = parseManifestInput(raw);
-
-    let policy = {};
-    try {
-      const dbMod = await import("../src/lib/db.js");
-      const p = dbMod.getPolicy("default_org");
-      if (p) policy = p as Record<string, unknown>;
-    } catch {
-      try {
-        const dbMod = await import("../src/lib/db.ts");
-        const p = dbMod.getPolicy("default_org");
-        if (p) policy = p as Record<string, unknown>;
-      } catch {
-        // ignore
-      }
-    }
+    const manifestRaw = await resolveManifest(target, options);
+    const manifest = parseManifestInput(manifestRaw);
+    const policy = await loadPolicy(options);
     const report = scanManifest(manifest, policy);
 
     if (options.json) {
       console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+
+    if (options.sarif) {
+      const sarif = generateSarif(report, target ?? "linejump://manifest");
+      if (options.sarif === "-") {
+        console.log(sarif);
+      } else {
+        fs.writeFileSync(path.resolve(options.sarif), sarif, "utf-8");
+        console.error(`SARIF written to ${options.sarif}`);
+      }
       return;
     }
 

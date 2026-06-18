@@ -1,33 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import {
-  ArrowRight,
-  Fingerprint,
-  ScanSearch,
-  GitCompare,
-  FileSignature,
-  Network,
-  Clock,
-} from "lucide-react";
+import { ArrowRight, Fingerprint, ScanSearch, GitCompare, Globe, ShieldCheck } from "lucide-react";
 import { LinejumpLogo } from "@/components/linejump-logo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Linejump — Pre-flight risk intelligence for MCP servers" },
+      { title: "Linejump — MCP security, pre-flight" },
       {
         name: "description",
         content:
-          "Linejump audits MCP servers before they ever touch your model's context window. Forensic manifest analysis, drift attestation, and fleet-wide line-jumping defense for every security team.",
+          "Audit every MCP server before it reaches your model. Forensic manifest analysis, drift detection, and fleet-wide visibility.",
       },
       {
         property: "og:title",
-        content: "Linejump — Pre-flight risk intelligence for MCP servers",
+        content: "Linejump — MCP security, pre-flight",
       },
       {
         property: "og:description",
-        content:
-          "Forensic, signed, pre-connection audits of every MCP server in your fleet. Not a runtime wrapper — an evidence layer.",
+        content: "Audit every MCP server before it reaches your model.",
       },
     ],
   }),
@@ -36,9 +27,9 @@ export const Route = createFileRoute("/")({
 
 const ease = [0.16, 1, 0.3, 1] as const;
 const fadeUp = {
-  initial: { opacity: 0, y: 18 },
+  initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.8, ease },
+  transition: { duration: 0.9, ease },
 };
 
 function Landing() {
@@ -46,10 +37,9 @@ function Landing() {
     <div className="min-h-screen bg-background text-foreground">
       <Nav />
       <Hero />
-      <Marquee />
-      <Difference />
-      <Pillars />
-      <HowItWorks />
+      <Statement />
+      <Features />
+      <Steps />
       <CTA />
       <Footer />
     </div>
@@ -59,32 +49,21 @@ function Landing() {
 function Nav() {
   return (
     <motion.header
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease }}
-      className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8, ease }}
+      className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur-2xl"
     >
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+      <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2">
-          <LinejumpLogo size={22} className="text-foreground" />
-          <span className="text-[15px] font-medium tracking-tight">Linejump</span>
+          <LinejumpLogo size={20} className="text-foreground" />
+          <span className="text-[14px] font-medium tracking-tight">Linejump</span>
         </Link>
-        <nav className="hidden gap-8 text-[13px] text-muted-foreground sm:flex">
-          <a href="#difference" className="hover:text-foreground transition-colors">
-            Why Linejump
-          </a>
-          <a href="#pillars" className="hover:text-foreground transition-colors">
-            Platform
-          </a>
-          <a href="#how" className="hover:text-foreground transition-colors">
-            How it works
-          </a>
-        </nav>
         <Link
           to="/app"
-          className="group inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-all hover:opacity-90"
+          className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground transition-opacity hover:opacity-60"
         >
-          Open scanner
+          Scanner
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -95,63 +74,48 @@ function Nav() {
 function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="mx-auto max-w-6xl px-6 pb-28 pt-28 sm:pt-40">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,oklch(0.78_0.08_55_/_0.12),transparent)]" />
+      <div className="mx-auto max-w-5xl px-6 pb-20 pt-24 sm:pt-32 sm:pb-28">
         <motion.div
           initial="initial"
           animate="animate"
-          transition={{ staggerChildren: 0.08 }}
+          transition={{ staggerChildren: 0.1 }}
           className="mx-auto max-w-3xl text-center"
         >
-          <motion.div
-            {...fadeUp}
-            className="mb-7 inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-[12px] text-muted-foreground"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Pre-flight intelligence for the MCP supply chain
-          </motion.div>
-
           <motion.h1
             {...fadeUp}
-            className="text-balance text-5xl font-semibold tracking-[-0.04em] sm:text-7xl"
+            className="text-balance text-[2.75rem] font-semibold leading-[1.05] tracking-[-0.045em] sm:text-7xl"
           >
-            Audit every MCP server
+            Audit every MCP server.
             <br />
-            <span className="text-muted-foreground">before it audits you.</span>
+            <span className="text-muted-foreground">Before it reaches your model.</span>
           </motion.h1>
 
           <motion.p
             {...fadeUp}
-            className="mx-auto mt-7 max-w-xl text-pretty text-[17px] leading-[1.55] text-muted-foreground"
+            className="mx-auto mt-6 max-w-md text-pretty text-[17px] leading-relaxed text-muted-foreground sm:text-[19px]"
           >
-            Wrappers fix the symptom at runtime. Linejump fixes the root cause — a forensic, signed
-            audit of every manifest, instruction, and tool description <em>before</em> a single byte
-            reaches your model's context window.
+            Forensic scans of manifests, tools, and instructions — before a single byte hits
+            context.
           </motion.p>
 
-          <motion.div {...fadeUp} className="mt-11 flex items-center justify-center gap-3">
+          <motion.div {...fadeUp} className="mt-10">
             <Link
               to="/app"
-              className="group inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90"
+              className="group inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-[15px] font-medium text-primary-foreground transition-opacity hover:opacity-85"
             >
               Run a scan
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <a
-              href="#difference"
-              className="rounded-full px-5 py-2.5 text-[14px] font-medium text-foreground hover:bg-secondary transition-colors"
-            >
-              How we're different
-            </a>
           </motion.div>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 48 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease, delay: 0.35 }}
-          className="relative mx-auto mt-24 max-w-4xl"
+          transition={{ duration: 1.1, ease, delay: 0.3 }}
+          className="relative mx-auto mt-20 max-w-3xl sm:mt-28"
         >
-          <div className="absolute inset-x-0 -top-12 -z-10 mx-auto h-64 w-3/4 rounded-full bg-accent/40 blur-3xl" />
           <ScanCard />
         </motion.div>
       </div>
@@ -160,60 +124,41 @@ function Hero() {
 }
 
 function ScanCard() {
-  const rows: { sev: "critical" | "high" | "medium" | "ok"; label: string; meta: string }[] = [
-    { sev: "critical", label: "Embedded <|system|> override", meta: "tool · fetch_url · desc" },
-    {
-      sev: "high",
-      label: "Hidden ANSI escape · CSI sequence",
-      meta: "tool · open_terminal · desc",
-    },
-    { sev: "high", label: "Prompt-injection phrase detected", meta: "instructions" },
-    { sev: "medium", label: "Reader + outbound sender pair", meta: "read_file → http_post" },
-    {
-      sev: "ok",
-      label: "Trust pin matches v1.4.2 attestation",
-      meta: "fingerprint · sha256:9f3e…",
-    },
+  const rows: { sev: "critical" | "high" | "medium" | "ok"; label: string }[] = [
+    { sev: "critical", label: "Embedded system override" },
+    { sev: "high", label: "Hidden ANSI escape sequence" },
+    { sev: "high", label: "Prompt-injection phrase" },
+    { sev: "medium", label: "Reader + outbound sender pair" },
+    { sev: "ok", label: "Trust pin verified" },
   ];
   const sevColor = {
-    critical: "bg-destructive/15 text-destructive border-destructive/30",
-    high: "bg-[oklch(0.72_0.14_45_/_0.15)] text-[oklch(0.42_0.16_40)] border-[oklch(0.72_0.14_45_/_0.3)]",
-    medium:
-      "bg-[oklch(0.78_0.12_75_/_0.2)] text-[oklch(0.4_0.1_70)] border-[oklch(0.78_0.12_75_/_0.35)]",
-    ok: "bg-[oklch(0.78_0.08_150_/_0.2)] text-[oklch(0.38_0.09_150)] border-[oklch(0.78_0.08_150_/_0.35)]",
+    critical: "bg-destructive/12 text-destructive",
+    high: "bg-[oklch(0.72_0.14_45_/_0.12)] text-[oklch(0.42_0.16_40)]",
+    medium: "bg-[oklch(0.78_0.12_75_/_0.15)] text-[oklch(0.4_0.1_70)]",
+    ok: "bg-[oklch(0.78_0.08_150_/_0.15)] text-[oklch(0.38_0.09_150)]",
   };
   return (
-    <div className="rounded-2xl border border-border bg-card/80 p-1 shadow-[0_30px_80px_-30px_oklch(0.35_0.05_55_/_0.25)] backdrop-blur">
-      <div className="rounded-xl bg-background/60 p-6 sm:p-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-destructive/70" />
-            <span className="h-2 w-2 rounded-full bg-[oklch(0.78_0.12_75)]" />
-            <span className="h-2 w-2 rounded-full bg-[oklch(0.6_0.12_150)]" />
-            <span className="ml-3 font-mono">linejump audit acme-mcp@1.4.2</span>
-          </div>
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            attested 0.6s
-          </div>
+    <div className="rounded-[1.25rem] border border-border/60 bg-card/60 p-1 shadow-[0_40px_100px_-40px_oklch(0.35_0.05_55_/_0.2)] backdrop-blur-xl">
+      <div className="rounded-[1rem] bg-background/50 px-6 py-7 sm:px-8 sm:py-9">
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          <span className="font-mono normal-case tracking-normal">acme-mcp · v1.4.2</span>
+          <span>0.6s</span>
         </div>
-        <div className="mt-6 space-y-2.5">
+        <div className="mt-7 space-y-2">
           {rows.map((r, i) => (
             <motion.div
               key={r.label}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, ease, delay: 0.55 + i * 0.08 }}
-              className="flex items-center gap-3 rounded-lg border border-border/70 bg-card/50 px-3 py-2.5"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease, delay: 0.5 + i * 0.07 }}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-secondary/40"
             >
               <span
-                className={`rounded-full border px-2 py-0.5 text-[10.5px] uppercase tracking-wider ${sevColor[r.sev]}`}
+                className={`rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${sevColor[r.sev]}`}
               >
                 {r.sev}
               </span>
-              <span className="truncate text-[13px] text-foreground">{r.label}</span>
-              <span className="ml-auto font-mono text-[11.5px] text-muted-foreground">
-                {r.meta}
-              </span>
+              <span className="text-[14px] text-foreground">{r.label}</span>
             </motion.div>
           ))}
         </div>
@@ -222,200 +167,65 @@ function ScanCard() {
   );
 }
 
-function Marquee() {
-  const items = [
-    "Prompt injection",
-    "ANSI escapes",
-    "Tool-shadowing",
-    "Cross-tool exfil",
-    "Hidden bidi",
-    "Description drift",
-    "Unsigned updates",
-    "Capability creep",
-  ];
+function Statement() {
   return (
-    <section className="border-y border-border/50 bg-card/40">
-      <div className="mx-auto max-w-6xl overflow-hidden px-6 py-6">
+    <section className="border-t border-border/40">
+      <div className="mx-auto max-w-5xl px-6 py-28 sm:py-36">
         <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, ease }}
-          className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[12.5px] uppercase tracking-[0.16em] text-muted-foreground"
-        >
-          <span className="text-foreground/90">We catch</span>
-          {items.map((s) => (
-            <span key={s}>{s}</span>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function Difference() {
-  return (
-    <section id="difference" className="border-b border-border/50">
-      <div className="mx-auto max-w-6xl px-6 py-28">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, ease }}
-          className="max-w-3xl"
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.9, ease }}
+          className="mx-auto max-w-2xl text-center"
         >
-          <div className="text-[12px] uppercase tracking-[0.18em] text-muted-foreground">
-            Why Linejump
-          </div>
-          <h2 className="mt-3 text-balance text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
-            Wrappers are a patch. <br />
-            <span className="text-muted-foreground">Linejump is the evidence layer.</span>
+          <h2 className="text-balance text-3xl font-semibold tracking-[-0.035em] sm:text-5xl">
+            Not a runtime wrapper.
+            <br />
+            <span className="text-muted-foreground">An evidence layer.</span>
           </h2>
-          <p className="mt-5 text-[16px] leading-[1.6] text-muted-foreground">
-            Runtime wrappers sit between your model and the server and re-prompt the human in the
-            loop on every change. That works for one developer. It collapses inside a company with
-            hundreds of servers, dozens of agents, and a change-management policy. Linejump runs{" "}
-            <em>before</em> the connection, captures cryptographic evidence of what the server
-            actually exposed at that moment, and lets your security team approve, deny, and diff it
-            like any other supply-chain artifact.
+          <p className="mx-auto mt-5 max-w-md text-[16px] leading-relaxed text-muted-foreground sm:text-[17px]">
+            Scan before you connect. Pin trust. Catch drift. Export proof.
           </p>
         </motion.div>
-
-        <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2">
-          <CompareCard
-            kind="them"
-            title="Runtime wrappers"
-            points={[
-              "Proxy on the developer's machine",
-              "Re-prompt per config change → alert fatigue",
-              "No central fleet view",
-              "Evidence lives in one local SQLite",
-              "Blocks at the wire, not at procurement",
-            ]}
-          />
-          <CompareCard
-            kind="us"
-            title="Linejump"
-            points={[
-              "Pre-connection audit at CI / registry / gateway",
-              "Signed attestation per version, diffed automatically",
-              "Fleet-wide drift map across every team",
-              "Exportable evidence: SBOM-style, SARIF, PDF",
-              "Policy as code: deny shell, require approval on write",
-            ]}
-          />
-        </div>
       </div>
     </section>
   );
 }
 
-function CompareCard({
-  kind,
-  title,
-  points,
-}: {
-  kind: "us" | "them";
-  title: string;
-  points: string[];
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.6, ease }}
-      className={`p-8 sm:p-10 ${kind === "us" ? "bg-card" : "bg-background"}`}
-    >
-      <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            kind === "us" ? "bg-accent" : "bg-muted-foreground/40"
-          }`}
-        />
-        {kind === "us" ? "Linejump approach" : "Wrapper approach"}
-      </div>
-      <h3 className="mt-3 text-[22px] font-medium tracking-tight">{title}</h3>
-      <ul className="mt-6 space-y-3.5 text-[14.5px] leading-relaxed">
-        {points.map((p) => (
-          <li key={p} className="flex items-start gap-3">
-            <span
-              className={`mt-2 h-1 w-1 shrink-0 rounded-full ${
-                kind === "us" ? "bg-foreground" : "bg-muted-foreground/50"
-              }`}
-            />
-            <span className={kind === "us" ? "text-foreground" : "text-muted-foreground"}>{p}</span>
-          </li>
-        ))}
-      </ul>
-    </motion.div>
-  );
-}
-
-function Pillars() {
+function Features() {
   const items = [
     {
       icon: ScanSearch,
-      title: "Forensic manifest analysis",
-      body: "Every tool description, instruction, input schema, and resource template is parsed, normalized, and scanned for prompt injection, hidden ANSI, zero-width, bidi, and capability hints.",
+      title: "Forensic analysis",
+      body: "Every tool, schema, and instruction — scanned for injection, escapes, and hidden capabilities.",
     },
     {
       icon: Fingerprint,
-      title: "Cryptographic trust pinning",
-      body: "Each scan produces a signed fingerprint of the exact bytes the server exposed. When a vendor silently updates a tool, the next pull fails the attestation before the model ever sees it.",
+      title: "Trust pinning",
+      body: "A fingerprint of exactly what the server exposed. Silent updates fail before your model sees them.",
     },
     {
       icon: GitCompare,
-      title: "Semantic drift diffs",
-      body: "Compare any two versions of a server side-by-side. We surface meaning-level changes — new capabilities, expanded scopes, new exfil paths — not just textual diffs.",
-    },
-    {
-      icon: Network,
-      title: "Fleet-wide visibility",
-      body: "A single view of every MCP server connected by every team. Group by owner, capability, risk score; gate connections by policy; revoke an entire publisher in one click.",
-    },
-    {
-      icon: FileSignature,
-      title: "Auditable evidence",
-      body: "Export SARIF for code-scanning pipelines, JSON for SIEMs, and signed PDF reports for procurement and SOC 2. Every finding carries the exact byte range that triggered it.",
-    },
-    {
-      icon: Clock,
-      title: "Policy as code",
-      body: "Declare rules in YAML — deny shell, require human approval on filesystem writes, block servers without an attested publisher. Enforce in CI, at the gateway, or at the registry.",
+      title: "Drift detection",
+      body: "Compare any two versions. Surface new capabilities and expanded scopes — not just text diffs.",
     },
   ];
   return (
-    <section id="pillars" className="border-b border-border/50 bg-card/40">
-      <div className="mx-auto max-w-6xl px-6 py-28">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, ease }}
-          className="max-w-2xl"
-        >
-          <div className="text-[12px] uppercase tracking-[0.18em] text-muted-foreground">
-            Platform
-          </div>
-          <h2 className="mt-3 text-balance text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
-            Six primitives. One audit trail.
-          </h2>
-        </motion.div>
-
-        <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+    <section className="border-t border-border/40 bg-card/30">
+      <div className="mx-auto max-w-5xl px-6 py-28 sm:py-36">
+        <div className="grid gap-16 sm:grid-cols-3 sm:gap-10">
           {items.map((it, i) => (
             <motion.div
               key={it.title}
-              initial={{ opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.6, ease, delay: i * 0.05 }}
-              className="group bg-card p-8 transition-colors hover:bg-card/80"
+              transition={{ duration: 0.7, ease, delay: i * 0.08 }}
+              className="text-center sm:text-left"
             >
-              <it.icon className="h-5 w-5 text-foreground" strokeWidth={1.5} />
-              <h3 className="mt-6 text-[17px] font-medium tracking-tight">{it.title}</h3>
-              <p className="mt-2 text-[14px] leading-[1.6] text-muted-foreground">{it.body}</p>
+              <it.icon className="mx-auto h-5 w-5 text-foreground sm:mx-0" strokeWidth={1.5} />
+              <h3 className="mt-5 text-[19px] font-semibold tracking-[-0.02em]">{it.title}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{it.body}</p>
             </motion.div>
           ))}
         </div>
@@ -424,99 +234,188 @@ function Pillars() {
   );
 }
 
-function HowItWorks() {
+function Steps() {
   const steps = [
     {
       n: "01",
-      title: "Point Linejump at a server",
-      body: "Paste a URL, a stdio command, or a manifest. Linejump fetches what the server actually exposes — not what its README claims.",
+      title: "Point at a server",
+      body: "URL, manifest, or live endpoint.",
+      visual: <StepVisualPoint />,
     },
     {
       n: "02",
-      title: "Static + semantic audit",
-      body: "We parse every instruction and tool description, run injection / ANSI / capability rules, and capture an immutable fingerprint of the response.",
+      title: "Run the audit",
+      body: "Static rules plus semantic analysis.",
+      visual: <StepVisualAudit />,
     },
     {
       n: "03",
-      title: "Sign, store, share",
-      body: "Every audit is signed, versioned, and exportable. Wire it into CI to fail builds; into your registry to gate publishing; into procurement to approve vendors.",
-    },
-    {
-      n: "04",
-      title: "Diff on every change",
-      body: "When a server's tool descriptions change, Linejump catches it the next time you scan — before the new bytes touch your model's context window.",
+      title: "Export and enforce",
+      body: "CI, registry, or gateway.",
+      visual: <StepVisualEnforce />,
     },
   ];
+
   return (
-    <section id="how" className="border-b border-border/50">
-      <div className="mx-auto max-w-6xl px-6 py-28">
-        <motion.div
+    <section className="border-t border-border/40 overflow-hidden">
+      <div className="mx-auto max-w-5xl px-6 py-28 sm:py-36">
+        <motion.h2
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
+          viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.8, ease }}
-          className="max-w-2xl"
+          className="text-center text-3xl font-semibold tracking-[-0.035em] sm:text-5xl"
         >
-          <div className="text-[12px] uppercase tracking-[0.18em] text-muted-foreground">
-            How it works
-          </div>
-          <h2 className="mt-3 text-balance text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
-            Audit. Attest. Diff. Repeat.
-          </h2>
-        </motion.div>
+          Three steps. Done.
+        </motion.h2>
 
-        <div className="mt-14 grid gap-10 md:grid-cols-2">
-          {steps.map((s, i) => (
-            <motion.div
-              key={s.n}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.6, ease, delay: i * 0.06 }}
-              className="flex gap-6"
-            >
-              <div className="font-mono text-[12px] tracking-wider text-muted-foreground">
-                {s.n}
-              </div>
-              <div>
-                <h3 className="text-[18px] font-medium tracking-tight">{s.title}</h3>
-                <p className="mt-2 text-[14.5px] leading-[1.6] text-muted-foreground">{s.body}</p>
-              </div>
-            </motion.div>
-          ))}
+        <div className="mx-auto mt-16 max-w-4xl">
+          <div className="grid gap-10 sm:grid-cols-3 sm:gap-6">
+            {steps.map((s, i) => (
+              <motion.div
+                key={s.n}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease, delay: i * 0.12 }}
+                className="flex flex-col items-center text-center"
+              >
+                <div className="w-full overflow-hidden rounded-2xl border border-border/60 bg-card/50 shadow-[0_20px_60px_-30px_oklch(0.35_0.05_55_/_0.18)] backdrop-blur-sm">
+                  <div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
+                    <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
+                      {s.n}
+                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent/80" />
+                  </div>
+                  <div className="flex h-[9.5rem] items-center justify-center p-4">{s.visual}</div>
+                </div>
+
+                <h3 className="mt-5 text-[17px] font-semibold tracking-[-0.02em]">{s.title}</h3>
+                <p className="mt-1.5 max-w-[11rem] text-[14px] leading-relaxed text-muted-foreground">
+                  {s.body}
+                </p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function StepVisualPoint() {
+  return (
+    <div className="w-full max-w-[11rem] space-y-2">
+      <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/80 px-2.5 py-2">
+        <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+        <span className="truncate font-mono text-[10px] text-muted-foreground">
+          mcp.example.com
+        </span>
+      </div>
+      <div className="rounded-lg border border-dashed border-border/60 bg-background/40 px-2.5 py-2">
+        <div className="font-mono text-[9px] leading-relaxed text-muted-foreground/80">
+          {`{ "tools": [ … ] }`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepVisualAudit() {
+  const rows = [
+    { sev: "bg-destructive/70", w: "w-[85%]" },
+    { sev: "bg-[oklch(0.72_0.14_45)]", w: "w-[70%]" },
+    { sev: "bg-[oklch(0.78_0.12_75)]", w: "w-[55%]" },
+    { sev: "bg-[oklch(0.6_0.12_150)]", w: "w-[40%]" },
+  ];
+  return (
+    <div className="flex w-full max-w-[11rem] flex-col items-center gap-3">
+      <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-border/60 bg-background/80">
+        <ScanSearch className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          whileInView={{ scale: 1, opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease, delay: 0.3 }}
+          className="absolute inset-0 rounded-full border border-foreground/10"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.35, 1], opacity: [0.35, 0, 0.35] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-0 rounded-full border border-foreground/15"
+        />
+      </div>
+      <div className="w-full space-y-1.5">
+        {rows.map((r, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -8 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, ease, delay: 0.35 + i * 0.08 }}
+            className="flex items-center gap-2"
+          >
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.sev}`} />
+            <div className={`h-1.5 rounded-full bg-secondary ${r.w}`} />
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StepVisualEnforce() {
+  const targets = ["CI", "Registry", "Gateway"];
+  return (
+    <div className="flex w-full max-w-[10rem] flex-col items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-background/80">
+        <ShieldCheck className="h-4 w-4 text-foreground" strokeWidth={1.5} />
+      </div>
+      <div className="flex w-full flex-col gap-1.5">
+        {targets.map((t, i) => (
+          <motion.div
+            key={t}
+            initial={{ opacity: 0, y: 4 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, ease, delay: 0.25 + i * 0.08 }}
+            className="w-full rounded-lg border border-border/50 bg-background/70 px-3 py-2 text-center text-[11px] font-medium tracking-wide text-foreground"
+          >
+            {t}
+          </motion.div>
+        ))}
+      </div>
+    </div>
   );
 }
 
 function CTA() {
   return (
-    <section className="border-b border-border/50">
-      <div className="mx-auto max-w-6xl px-6 py-32 text-center">
+    <section className="border-t border-border/40">
+      <div className="mx-auto max-w-5xl px-6 py-32 text-center sm:py-40">
         <motion.h2
           initial={{ opacity: 0, y: 18 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.8, ease }}
-          className="mx-auto max-w-3xl text-balance text-5xl font-semibold tracking-[-0.035em] sm:text-6xl"
+          className="text-balance text-4xl font-semibold tracking-[-0.04em] sm:text-6xl"
         >
-          Start with one server.
+          See what&apos;s hiding
           <br />
-          <span className="text-muted-foreground">See what's hiding in your fleet.</span>
+          <span className="text-muted-foreground">in your fleet.</span>
         </motion.h2>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.7, ease, delay: 0.15 }}
-          className="mt-10 flex items-center justify-center gap-3"
+          transition={{ duration: 0.7, ease, delay: 0.12 }}
+          className="mt-10"
         >
           <Link
             to="/app"
-            className="group inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90"
+            className="group inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-[15px] font-medium text-primary-foreground transition-opacity hover:opacity-85"
           >
-            Open the scanner
+            Open scanner
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </motion.div>
@@ -527,13 +426,13 @@ function CTA() {
 
 function Footer() {
   return (
-    <footer>
-      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-6 py-12 text-[12.5px] text-muted-foreground sm:flex-row sm:items-center">
+    <footer className="border-t border-border/40">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-8 text-[12px] text-muted-foreground">
         <div className="flex items-center gap-2">
-          <LinejumpLogo size={16} className="text-foreground" />
-          <span>Linejump — pre-flight risk intelligence for MCP servers.</span>
+          <LinejumpLogo size={14} className="text-foreground" />
+          <span>Linejump</span>
         </div>
-        <div>Built on research into MCP line-jumping attacks.</div>
+        <span>MCP security, pre-flight.</span>
       </div>
     </footer>
   );

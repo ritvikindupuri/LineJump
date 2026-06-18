@@ -87,7 +87,8 @@ function PolicyPage() {
           <div className="p-6 border rounded-xl bg-card">
             <h2 className="text-lg font-medium mb-4">Disabled Rules</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Comma-separated rule titles to ignore entirely.
+              Comma-separated rule IDs or titles to ignore (e.g.{" "}
+              <code className="text-xs">injection.phrase_list, capability.filesystem_read</code>).
             </p>
             <input
               type="text"
