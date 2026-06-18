@@ -17,8 +17,24 @@ export function LinejumpLogo({ size = 40, animated = false, className, ...props 
       {...props}
     >
       {/* Minimal monochrome mark: two parallel lines with an arc "jumping" the gap */}
-      <line x1="6" y1="26" x2="16" y2="26" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-      <line x1="24" y1="26" x2="34" y2="26" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <line
+        x1="6"
+        y1="26"
+        x2="16"
+        y2="26"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <line
+        x1="24"
+        y1="26"
+        x2="34"
+        y2="26"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
       <path
         d="M14 26 C 16 12, 24 12, 26 26"
         stroke="currentColor"
@@ -32,7 +48,13 @@ export function LinejumpLogo({ size = 40, animated = false, className, ...props 
   );
 }
 
-export function LinejumpWordmark({ height = 24, animated = false }: { height?: number; animated?: boolean }) {
+export function LinejumpWordmark({
+  height = 24,
+  animated = false,
+}: {
+  height?: number;
+  animated?: boolean;
+}) {
   return (
     <div className="flex items-center gap-2 text-foreground">
       <LinejumpLogo size={height * 1.4} animated={animated} />

@@ -34,6 +34,14 @@ export interface ScanReport {
   score: number; // 0-100, higher = safer
 }
 
+export interface ScannerPolicy {
+  disabledRules?: string[];
+  customRegexes?: Array<{ regex: string; severity: RiskSeverity; title: string; category: string }>;
+  severityOverrides?: Record<string, RiskSeverity>;
+  blockedCapabilities?: string[];
+  requireApproval?: boolean;
+}
+
 // eslint-disable-next-line no-control-regex
 const ANSI_ESCAPE_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/;
 // eslint-disable-next-line no-control-regex
@@ -105,10 +113,33 @@ function lower(s: string | undefined) {
   return (s ?? "").toLowerCase();
 }
 
-function scanText(text: string, toolName: string | undefined, category: string): Finding[] {
+function scanText(
+  text: string,
+  toolName: string | undefined,
+  category: string,
+  policy?: ScannerPolicy,
+): Finding[] {
   const findings: Finding[] = [];
   if (!text) return findings;
   const lc = text.toLowerCase();
+
+  // Custom regexes
+  if (policy?.customRegexes) {
+    for (const rule of policy.customRegexes) {
+      const re = new RegExp(rule.regex, "i");
+      if (re.test(text)) {
+        findings.push({
+          id: id(),
+          severity: rule.severity,
+          category: rule.category,
+          title: rule.title,
+          detail: `Matched custom rule: ${rule.regex}`,
+          toolName,
+          evidence: JSON.stringify(text.match(re)?.slice(0, 3)),
+        });
+      }
+    }
+  }
 
   // ANSI escape sequences
   if (ANSI_ESCAPE_RE.test(text)) {
@@ -266,23 +297,30 @@ const SEVERITY_WEIGHT: Record<RiskSeverity, number> = {
   info: 0,
 };
 
-export function scanManifest(manifest: McpManifest): ScanReport {
+export function scanManifest(manifest: McpManifest, policy?: ScannerPolicy): ScanReport {
   const findings: Finding[] = [];
   const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
 
   // Server-level description if present
   if (typeof manifest.description === "string") {
-    findings.push(...scanText(manifest.description, undefined, "Server description"));
+    findings.push(...scanText(manifest.description, undefined, "Server description", policy));
   }
 
   for (const t of tools) {
     findings.push(...scanToolName(t.name));
-    findings.push(...scanText(lower(t.description) ? (t.description as string) : "", t.name, "Tool description"));
+    findings.push(
+      ...scanText(
+        lower(t.description) ? (t.description as string) : "",
+        t.name,
+        "Tool description",
+        policy,
+      ),
+    );
     // Schema descriptions
     try {
       const schemaJson = JSON.stringify(t.inputSchema ?? {});
       if (schemaJson.length > 2) {
-        findings.push(...scanText(schemaJson, t.name, "Input schema"));
+        findings.push(...scanText(schemaJson, t.name, "Input schema", policy));
       }
     } catch {
       // ignore
@@ -304,12 +342,25 @@ export function scanManifest(manifest: McpManifest): ScanReport {
 
   // Dedupe by toolName+title
   const seen = new Set<string>();
-  const deduped = findings.filter((f) => {
-    const k = `${f.toolName ?? ""}::${f.title}::${f.evidence ?? ""}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
+  const deduped = findings
+    .filter((f) => {
+      const k = `${f.toolName ?? ""}::${f.title}::${f.evidence ?? ""}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      if (policy?.disabledRules?.includes(f.title)) return false;
+      return true;
+    })
+    .map((f) => {
+      if (policy?.severityOverrides?.[f.title]) {
+        return { ...f, severity: policy.severityOverrides[f.title] };
+      }
+      if (
+        policy?.blockedCapabilities?.some((cap) => f.detail.includes(cap) || f.title.includes(cap))
+      ) {
+        return { ...f, severity: "critical" as RiskSeverity };
+      }
+      return f;
+    });
 
   const penalty = deduped.reduce((acc, f) => acc + SEVERITY_WEIGHT[f.severity], 0);
   const score = Math.max(0, Math.min(100, 100 - penalty));
@@ -318,9 +369,7 @@ export function scanManifest(manifest: McpManifest): ScanReport {
     serverName: typeof manifest.name === "string" ? manifest.name : "Unnamed MCP server",
     toolCount: tools.length,
     scannedAt: new Date().toISOString(),
-    findings: deduped.sort(
-      (a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity],
-    ),
+    findings: deduped.sort((a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity]),
     score,
   };
 }
@@ -343,7 +392,11 @@ export function parseManifestInput(raw: string): McpManifest {
     return { tools: parsed as McpTool[] };
   }
   if (Array.isArray(obj.tools)) return obj as McpManifest;
-  if (obj.result && typeof obj.result === "object" && Array.isArray((obj.result as { tools?: unknown }).tools)) {
+  if (
+    obj.result &&
+    typeof obj.result === "object" &&
+    Array.isArray((obj.result as { tools?: unknown }).tools)
+  ) {
     return { ...(obj.result as McpManifest) };
   }
   // Single tool object

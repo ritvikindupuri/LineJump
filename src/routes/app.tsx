@@ -1,13 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  ArrowLeft,
-  ScanLine,
-  ShieldCheck,
-  AlertTriangle,
-  Globe,
-} from "lucide-react";
+import { ArrowLeft, ScanLine, ShieldCheck, AlertTriangle, Globe } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   parseManifestInput,
@@ -16,6 +10,8 @@ import {
   type RiskSeverity,
 } from "@/lib/mcp-scanner";
 import { fetchMcpManifest } from "@/lib/mcp-fetch.functions";
+import { fetchPolicy } from "@/lib/policy.functions";
+import { generateSignedReport } from "@/lib/attestation.functions";
 import { LinejumpLogo } from "@/components/linejump-logo";
 
 export const Route = createFileRoute("/app")({
@@ -51,14 +47,29 @@ function ScannerPage() {
   const [report, setReport] = useState<ScanReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const fetchManifest = useServerFn(fetchMcpManifest);
+  const [policy, setPolicy] = useState<unknown>(null);
+  const [attestation, setAttestation] = useState<{ signatureData: unknown; scanId: string } | null>(
+    null,
+  );
 
-  const handleScan = () => {
+  const fetchManifest = useServerFn(fetchMcpManifest);
+  const fetchPolicyData = useServerFn(fetchPolicy);
+  const signReportFn = useServerFn(generateSignedReport);
+
+  useEffect(() => {
+    fetchPolicyData().then(setPolicy).catch(console.error);
+  }, [fetchPolicyData]);
+
+  const handleScan = async () => {
     setError(null);
     setScanning(true);
+    setAttestation(null);
     try {
       const manifest = parseManifestInput(input);
-      setReport(scanManifest(manifest));
+      const newReport = scanManifest(manifest, policy || {});
+      setReport(newReport);
+      const res = await signReportFn({ data: { report: newReport, manifest, url: url || null } });
+      setAttestation(res);
     } catch (e) {
       setReport(null);
       setError(e instanceof Error ? e.message : "Failed to parse input.");
@@ -71,22 +82,56 @@ function ScannerPage() {
     if (!url.trim()) return;
     setError(null);
     setReport(null);
+    setAttestation(null);
     setFetching(true);
     setFetchedFrom(null);
     try {
       const res = await fetchManifest({ data: { url: url.trim() } });
       setInput(res.raw);
       setFetchedFrom(
-        res.source === "tools/list"
-          ? `Live tools/list · ${res.url}`
-          : `Manifest · ${res.url}`,
+        res.source === "tools/list" ? `Live tools/list · ${res.url}` : `Manifest · ${res.url}`,
       );
-      setReport(scanManifest(parseManifestInput(res.raw)));
+      const manifest = parseManifestInput(res.raw);
+      const newReport = scanManifest(manifest, policy || {});
+      setReport(newReport);
+      const sigRes = await signReportFn({ data: { report: newReport, manifest, url: url.trim() } });
+      setAttestation(sigRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch manifest.");
     } finally {
       setFetching(false);
     }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!report || !attestation) return;
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text("Linejump Security Attestation", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Server: ${report.serverName}`, 14, 32);
+    doc.text(`Scan ID: ${attestation.scanId}`, 14, 38);
+    doc.text(`Score: ${report.score}/100`, 14, 44);
+    doc.text(`Findings: ${report.findings.length}`, 14, 50);
+
+    doc.setFontSize(14);
+    doc.text("Findings", 14, 60);
+    doc.setFontSize(10);
+    let y = 68;
+    for (const f of report.findings.slice(0, 20)) {
+      doc.text(`[${f.severity.toUpperCase()}] ${f.title}`, 14, y);
+      y += 6;
+      const splitDetail = doc.splitTextToSize(f.detail, 180);
+      doc.text(splitDetail, 14, y);
+      y += splitDetail.length * 5 + 4;
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+
+    doc.save(`linejump-attestation-${attestation.scanId}.pdf`);
   };
 
   const counts = useMemo(() => {
@@ -108,17 +153,29 @@ function ScannerPage() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center gap-2">
             <LinejumpLogo size={22} className="text-foreground" />
-            <span className="text-[15px] font-medium tracking-tight">
-              Linejump
-            </span>
+            <span className="text-[15px] font-medium tracking-tight">Linejump</span>
           </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to overview
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/history"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              History
+            </Link>
+            <Link
+              to="/policy"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Policy
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -137,9 +194,8 @@ function ScannerPage() {
             Audit a manifest.
           </h1>
           <p className="mt-4 text-[16px] leading-[1.6] text-muted-foreground">
-            Point Linejump at a live MCP endpoint or paste a manifest. Every
-            scan runs the same forensic rules and produces an evidence-backed
-            report — no data leaves this session.
+            Point Linejump at a live MCP endpoint or paste a manifest. Every scan runs the same
+            forensic rules and produces an evidence-backed report — no data leaves this session.
           </p>
         </motion.div>
 
@@ -151,10 +207,7 @@ function ScannerPage() {
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex flex-1 items-center gap-2 px-3">
-              <Globe
-                className="h-4 w-4 text-muted-foreground"
-                strokeWidth={1.5}
-              />
+              <Globe className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -175,8 +228,7 @@ function ScannerPage() {
             </button>
           </div>
           <div className="px-3 pb-2 pt-1 text-[12px] text-muted-foreground">
-            {fetchedFrom ??
-              "GET first, then MCP tools/list over JSON-RPC. http(s) only."}
+            {fetchedFrom ?? "GET first, then MCP tools/list over JSON-RPC. http(s) only."}
           </div>
         </motion.div>
 
@@ -233,10 +285,7 @@ function ScannerPage() {
                   exit={{ opacity: 0 }}
                   className="flex h-full min-h-[380px] flex-col items-center justify-center text-center"
                 >
-                  <AlertTriangle
-                    className="h-6 w-6 text-destructive"
-                    strokeWidth={1.5}
-                  />
+                  <AlertTriangle className="h-6 w-6 text-destructive" strokeWidth={1.5} />
                   <p className="mt-3 text-[14px] text-foreground">{error}</p>
                 </motion.div>
               ) : report && counts ? (
@@ -248,6 +297,22 @@ function ScannerPage() {
                   transition={{ duration: 0.5, ease }}
                 >
                   <ReportView report={report} counts={counts} />
+                  {attestation && (
+                    <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-secondary/30 p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[13px] font-medium">Signed Attestation Available</div>
+                        <button
+                          onClick={handleDownloadPDF}
+                          className="text-[12px] underline text-primary"
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate font-mono">
+                        ID: {attestation.scanId}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
@@ -257,10 +322,7 @@ function ScannerPage() {
                   exit={{ opacity: 0 }}
                   className="flex h-full min-h-[380px] flex-col items-center justify-center text-center"
                 >
-                  <ShieldCheck
-                    className="h-7 w-7 text-muted-foreground"
-                    strokeWidth={1.25}
-                  />
+                  <ShieldCheck className="h-7 w-7 text-muted-foreground" strokeWidth={1.25} />
                   <p className="mt-4 text-[14px] text-muted-foreground">
                     Your report appears here.
                   </p>
@@ -296,9 +358,7 @@ function ReportView({
           </div>
         </div>
         <div className="rounded-full border border-border bg-background px-4 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Safety
-          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Safety</div>
           <div className="text-[20px] font-semibold tracking-tight">
             {report.score}
             <span className="text-[13px] text-muted-foreground">/100</span>
@@ -322,16 +382,10 @@ function ReportView({
       <div className="mt-6 max-h-[380px] space-y-3 overflow-y-auto pr-1">
         {report.findings.length === 0 ? (
           <div className="rounded-xl border border-border bg-background/50 p-6 text-center">
-            <ShieldCheck
-              className="mx-auto h-6 w-6 text-[oklch(0.6_0.12_150)]"
-              strokeWidth={1.5}
-            />
-            <p className="mt-2 text-[14px] text-foreground">
-              No risks detected.
-            </p>
+            <ShieldCheck className="mx-auto h-6 w-6 text-[oklch(0.6_0.12_150)]" strokeWidth={1.5} />
+            <p className="mt-2 text-[14px] text-foreground">No risks detected.</p>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Static checks passed. Continue to review dynamic behavior at
-              runtime.
+              Static checks passed. Continue to review dynamic behavior at runtime.
             </p>
           </div>
         ) : (
@@ -349,21 +403,15 @@ function ReportView({
                 >
                   {f.severity}
                 </span>
-                <span className="text-[11.5px] text-muted-foreground">
-                  {f.category}
-                </span>
+                <span className="text-[11.5px] text-muted-foreground">{f.category}</span>
                 {f.toolName ? (
                   <span className="ml-auto rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-secondary-foreground">
                     {f.toolName}
                   </span>
                 ) : null}
               </div>
-              <div className="mt-2 text-[14px] font-medium text-foreground">
-                {f.title}
-              </div>
-              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                {f.detail}
-              </p>
+              <div className="mt-2 text-[14px] font-medium text-foreground">{f.title}</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{f.detail}</p>
               {f.evidence ? (
                 <pre className="mt-2 overflow-x-auto rounded bg-secondary/60 p-2 font-mono text-[11.5px] text-secondary-foreground">
                   {f.evidence}

@@ -9,24 +9,23 @@ export interface FetchManifestResult {
 }
 
 function validateUrl(input: string): URL {
+  let urlString = input.trim();
+  if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) {
+    urlString = "https://" + urlString;
+  }
+
   let u: URL;
   try {
-    u = new URL(input);
+    u = new URL(urlString);
   } catch {
     throw new Error("Invalid URL.");
   }
-  if (u.protocol !== "https:" && u.protocol !== "http:") {
-    throw new Error("Only http(s) URLs are allowed.");
+  if (u.protocol !== "https:") {
+    throw new Error("Only https URLs are allowed.");
   }
   // Basic SSRF guards: block obvious internal hosts.
   const host = u.hostname.toLowerCase();
-  const blocked = [
-    "localhost",
-    "0.0.0.0",
-    "127.0.0.1",
-    "::1",
-    "metadata.google.internal",
-  ];
+  const blocked = ["localhost", "0.0.0.0", "127.0.0.1", "::1", "metadata.google.internal"];
   if (blocked.includes(host)) throw new Error("Host is not allowed.");
   if (
     host.endsWith(".local") ||

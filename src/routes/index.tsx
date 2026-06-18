@@ -79,9 +79,6 @@ function Nav() {
           <a href="#how" className="hover:text-foreground transition-colors">
             How it works
           </a>
-          <Link to="/docs" className="hover:text-foreground transition-colors">
-            Docs
-          </Link>
         </nav>
         <Link
           to="/app"
@@ -126,16 +123,12 @@ function Hero() {
             {...fadeUp}
             className="mx-auto mt-7 max-w-xl text-pretty text-[17px] leading-[1.55] text-muted-foreground"
           >
-            Wrappers fix the symptom at runtime. Linejump fixes the root cause —
-            a forensic, signed audit of every manifest, instruction, and tool
-            description <em>before</em> a single byte reaches your model's
-            context window.
+            Wrappers fix the symptom at runtime. Linejump fixes the root cause — a forensic, signed
+            audit of every manifest, instruction, and tool description <em>before</em> a single byte
+            reaches your model's context window.
           </motion.p>
 
-          <motion.div
-            {...fadeUp}
-            className="mt-11 flex items-center justify-center gap-3"
-          >
+          <motion.div {...fadeUp} className="mt-11 flex items-center justify-center gap-3">
             <Link
               to="/app"
               className="group inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90"
@@ -169,15 +162,24 @@ function Hero() {
 function ScanCard() {
   const rows: { sev: "critical" | "high" | "medium" | "ok"; label: string; meta: string }[] = [
     { sev: "critical", label: "Embedded <|system|> override", meta: "tool · fetch_url · desc" },
-    { sev: "high", label: "Hidden ANSI escape · CSI sequence", meta: "tool · open_terminal · desc" },
+    {
+      sev: "high",
+      label: "Hidden ANSI escape · CSI sequence",
+      meta: "tool · open_terminal · desc",
+    },
     { sev: "high", label: "Prompt-injection phrase detected", meta: "instructions" },
     { sev: "medium", label: "Reader + outbound sender pair", meta: "read_file → http_post" },
-    { sev: "ok", label: "Trust pin matches v1.4.2 attestation", meta: "fingerprint · sha256:9f3e…" },
+    {
+      sev: "ok",
+      label: "Trust pin matches v1.4.2 attestation",
+      meta: "fingerprint · sha256:9f3e…",
+    },
   ];
   const sevColor = {
     critical: "bg-destructive/15 text-destructive border-destructive/30",
     high: "bg-[oklch(0.72_0.14_45_/_0.15)] text-[oklch(0.42_0.16_40)] border-[oklch(0.72_0.14_45_/_0.3)]",
-    medium: "bg-[oklch(0.78_0.12_75_/_0.2)] text-[oklch(0.4_0.1_70)] border-[oklch(0.78_0.12_75_/_0.35)]",
+    medium:
+      "bg-[oklch(0.78_0.12_75_/_0.2)] text-[oklch(0.4_0.1_70)] border-[oklch(0.78_0.12_75_/_0.35)]",
     ok: "bg-[oklch(0.78_0.08_150_/_0.2)] text-[oklch(0.38_0.09_150)] border-[oklch(0.78_0.08_150_/_0.35)]",
   };
   return (
@@ -267,18 +269,15 @@ function Difference() {
           </div>
           <h2 className="mt-3 text-balance text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
             Wrappers are a patch. <br />
-            <span className="text-muted-foreground">
-              Linejump is the evidence layer.
-            </span>
+            <span className="text-muted-foreground">Linejump is the evidence layer.</span>
           </h2>
           <p className="mt-5 text-[16px] leading-[1.6] text-muted-foreground">
-            Runtime wrappers sit between your model and the server and re-prompt
-            the human in the loop on every change. That works for one developer.
-            It collapses inside a company with hundreds of servers, dozens of
-            agents, and a change-management policy. Linejump runs <em>before</em>{" "}
-            the connection, captures cryptographic evidence of what the server
-            actually exposed at that moment, and lets your security team
-            approve, deny, and diff it like any other supply-chain artifact.
+            Runtime wrappers sit between your model and the server and re-prompt the human in the
+            loop on every change. That works for one developer. It collapses inside a company with
+            hundreds of servers, dozens of agents, and a change-management policy. Linejump runs{" "}
+            <em>before</em> the connection, captures cryptographic evidence of what the server
+            actually exposed at that moment, and lets your security team approve, deny, and diff it
+            like any other supply-chain artifact.
           </p>
         </motion.div>
 
@@ -326,9 +325,7 @@ function CompareCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.6, ease }}
-      className={`p-8 sm:p-10 ${
-        kind === "us" ? "bg-card" : "bg-background"
-      }`}
+      className={`p-8 sm:p-10 ${kind === "us" ? "bg-card" : "bg-background"}`}
     >
       <div className="flex items-center gap-2 text-[12px] uppercase tracking-[0.18em] text-muted-foreground">
         <span
@@ -347,13 +344,7 @@ function CompareCard({
                 kind === "us" ? "bg-foreground" : "bg-muted-foreground/50"
               }`}
             />
-            <span
-              className={
-                kind === "us" ? "text-foreground" : "text-muted-foreground"
-              }
-            >
-              {p}
-            </span>
+            <span className={kind === "us" ? "text-foreground" : "text-muted-foreground"}>{p}</span>
           </li>
         ))}
       </ul>
@@ -366,38 +357,32 @@ function Pillars() {
     {
       icon: ScanSearch,
       title: "Forensic manifest analysis",
-      body:
-        "Every tool description, instruction, input schema, and resource template is parsed, normalized, and scanned for prompt injection, hidden ANSI, zero-width, bidi, and capability hints.",
+      body: "Every tool description, instruction, input schema, and resource template is parsed, normalized, and scanned for prompt injection, hidden ANSI, zero-width, bidi, and capability hints.",
     },
     {
       icon: Fingerprint,
       title: "Cryptographic trust pinning",
-      body:
-        "Each scan produces a signed fingerprint of the exact bytes the server exposed. When a vendor silently updates a tool, the next pull fails the attestation before the model ever sees it.",
+      body: "Each scan produces a signed fingerprint of the exact bytes the server exposed. When a vendor silently updates a tool, the next pull fails the attestation before the model ever sees it.",
     },
     {
       icon: GitCompare,
       title: "Semantic drift diffs",
-      body:
-        "Compare any two versions of a server side-by-side. We surface meaning-level changes — new capabilities, expanded scopes, new exfil paths — not just textual diffs.",
+      body: "Compare any two versions of a server side-by-side. We surface meaning-level changes — new capabilities, expanded scopes, new exfil paths — not just textual diffs.",
     },
     {
       icon: Network,
       title: "Fleet-wide visibility",
-      body:
-        "A single view of every MCP server connected by every team. Group by owner, capability, risk score; gate connections by policy; revoke an entire publisher in one click.",
+      body: "A single view of every MCP server connected by every team. Group by owner, capability, risk score; gate connections by policy; revoke an entire publisher in one click.",
     },
     {
       icon: FileSignature,
       title: "Auditable evidence",
-      body:
-        "Export SARIF for code-scanning pipelines, JSON for SIEMs, and signed PDF reports for procurement and SOC 2. Every finding carries the exact byte range that triggered it.",
+      body: "Export SARIF for code-scanning pipelines, JSON for SIEMs, and signed PDF reports for procurement and SOC 2. Every finding carries the exact byte range that triggered it.",
     },
     {
       icon: Clock,
       title: "Policy as code",
-      body:
-        "Declare rules in YAML — deny shell, require human approval on filesystem writes, block servers without an attested publisher. Enforce in CI, at the gateway, or at the registry.",
+      body: "Declare rules in YAML — deny shell, require human approval on filesystem writes, block servers without an attested publisher. Enforce in CI, at the gateway, or at the registry.",
     },
   ];
   return (
@@ -428,16 +413,9 @@ function Pillars() {
               transition={{ duration: 0.6, ease, delay: i * 0.05 }}
               className="group bg-card p-8 transition-colors hover:bg-card/80"
             >
-              <it.icon
-                className="h-5 w-5 text-foreground"
-                strokeWidth={1.5}
-              />
-              <h3 className="mt-6 text-[17px] font-medium tracking-tight">
-                {it.title}
-              </h3>
-              <p className="mt-2 text-[14px] leading-[1.6] text-muted-foreground">
-                {it.body}
-              </p>
+              <it.icon className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              <h3 className="mt-6 text-[17px] font-medium tracking-tight">{it.title}</h3>
+              <p className="mt-2 text-[14px] leading-[1.6] text-muted-foreground">{it.body}</p>
             </motion.div>
           ))}
         </div>
@@ -451,26 +429,22 @@ function HowItWorks() {
     {
       n: "01",
       title: "Point Linejump at a server",
-      body:
-        "Paste a URL, a stdio command, or a manifest. Linejump fetches what the server actually exposes — not what its README claims.",
+      body: "Paste a URL, a stdio command, or a manifest. Linejump fetches what the server actually exposes — not what its README claims.",
     },
     {
       n: "02",
       title: "Static + semantic audit",
-      body:
-        "We parse every instruction and tool description, run injection / ANSI / capability rules, and capture an immutable fingerprint of the response.",
+      body: "We parse every instruction and tool description, run injection / ANSI / capability rules, and capture an immutable fingerprint of the response.",
     },
     {
       n: "03",
       title: "Sign, store, share",
-      body:
-        "Every audit is signed, versioned, and exportable. Wire it into CI to fail builds; into your registry to gate publishing; into procurement to approve vendors.",
+      body: "Every audit is signed, versioned, and exportable. Wire it into CI to fail builds; into your registry to gate publishing; into procurement to approve vendors.",
     },
     {
       n: "04",
       title: "Diff on every change",
-      body:
-        "When a server's tool descriptions change, Linejump catches it the next time you scan — before the new bytes touch your model's context window.",
+      body: "When a server's tool descriptions change, Linejump catches it the next time you scan — before the new bytes touch your model's context window.",
     },
   ];
   return (
@@ -505,12 +479,8 @@ function HowItWorks() {
                 {s.n}
               </div>
               <div>
-                <h3 className="text-[18px] font-medium tracking-tight">
-                  {s.title}
-                </h3>
-                <p className="mt-2 text-[14.5px] leading-[1.6] text-muted-foreground">
-                  {s.body}
-                </p>
+                <h3 className="text-[18px] font-medium tracking-tight">{s.title}</h3>
+                <p className="mt-2 text-[14.5px] leading-[1.6] text-muted-foreground">{s.body}</p>
               </div>
             </motion.div>
           ))}
@@ -533,9 +503,7 @@ function CTA() {
         >
           Start with one server.
           <br />
-          <span className="text-muted-foreground">
-            See what's hiding in your fleet.
-          </span>
+          <span className="text-muted-foreground">See what's hiding in your fleet.</span>
         </motion.h2>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -550,12 +518,6 @@ function CTA() {
           >
             Open the scanner
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/docs"
-            className="rounded-full px-6 py-3 text-[14px] font-medium text-foreground hover:bg-secondary transition-colors"
-          >
-            Read the docs
           </Link>
         </motion.div>
       </div>
