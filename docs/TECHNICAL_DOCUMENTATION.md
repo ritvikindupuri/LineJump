@@ -28,13 +28,15 @@
 
 ## Executive summary
 
-Linejump is a **pre-flight static analysis platform** for Model Context Protocol (MCP) servers. Organizations use it to audit tool manifests, descriptions, and schemas before those definitions reach LLM context windows or production agent pipelines.
+Linejump is a **pre-flight static analysis platform** built to secure Model Context Protocol (MCP) servers. Organizations deploy Linejump to preemptively audit tool manifests, descriptions, input schemas, server prompts, and resource URIs *before* those definitions reach an LLM's context window or are exposed to production agent pipelines.
 
-Unlike runtime MCP proxies, Linejump operates on **declared metadata** — the same surface area a model sees when selecting tools. The detection engine (v2.1) applies deterministic rules for prompt injection, obfuscation, capability risk, schema analysis, and cross-tool exfiltration chains. Findings carry stable rule IDs for enterprise policy tuning.
+Unlike runtime MCP proxies which rely on dynamic fuzzing or interception during runtime invocation, Linejump operates deterministically on **declared metadata** — inspecting the precise surface area a model relies on when deciding whether or how to select tools.
 
-The application ships as a **web scanner** (TanStack Start + React), a **CLI** for CI and local stdio MCP servers, and **SQLite-backed** scan history with policy storage. Exports include **SARIF 2.1.0** for GitHub Advanced Security, PDF for audits, and JSON for automation.
+Powered by the highly-optimized **Detection Engine v2.1.0**, Linejump applies over 40 precise rules to detect prompt injection phrases, text obfuscation attacks (such as homoglyphs, invisible zero-width characters, HTML entities, ANSI escapes), over-broad administrative or sensitive capabilities, dangerous schema fields, and complex cross-tool exfiltration chain risks. Findings yield highly stable rule IDs, which integrates into a robust enterprise policy tuning mechanism.
 
-Linejump does **not** use autonomous LLM agents for detection. The engine is fully rule-based, reproducible, and offline-capable.
+The Linejump ecosystem comprises a **Web Scanner UI** (using React 19, TanStack Router, and TanStack Start), a powerful headless **CLI** designed for seamless CI/CD pipeline integration and local stdio MCP server spawning, and a highly performant **SQLite-backed data layer** managing scan history storage, side-by-side diffing, and enterprise policy persistency. Export mechanisms ensure compatibility across standard audit formats, including **SARIF 2.1.0** for automated code scanning and **PDF** for manual human reviews.
+
+Importantly, Linejump does **not** rely on slow, non-deterministic autonomous LLM agents to detect vulnerabilities. The engine is entirely rule-based, reproducible, statically verifiable, and capable of operating entirely offline without exposing proprietary manifests to third-party endpoints.
 
 ---
 
@@ -42,26 +44,28 @@ Linejump does **not** use autonomous LLM agents for detection. The engine is ful
 
 ### In scope
 
+Linejump natively analyzes and detects risks within the following domains:
+
 | Capability | Description |
 |------------|-------------|
-| Static manifest analysis | Tools, descriptions, input schemas |
-| Prompt & resource scanning | MCP prompts array, resource URIs |
-| Server-level fields | instructions, systemPrompt, serverInfo |
-| Live HTTPS fetch | GET JSON or MCP `tools/list` |
-| Local / stdio MCP | CLI-only process spawn |
-| Policy per organization | Disable rules, override severity |
-| Scan history & diff | SQLite persistence, side-by-side compare |
-| SARIF / PDF / JSON export | CI and human workflows |
+| **Static manifest analysis** | Full recursive scanning of tool names, descriptions, and JSON input schemas (`additionalProperties`, combinations like `oneOf`/`anyOf`/`allOf`, and nested property hierarchies). |
+| **Prompt & resource scanning** | Full surface coverage for the MCP `prompts` array (and associated text blocks) and the `resources` definitions (verifying sensitive remote endpoints and local filesystem traversal paths). |
+| **Server-level fields** | Deep heuristic inspection of high-level fields like `instructions`, `systemPrompt`, `serverInfo`, `readme`, and `documentation`. |
+| **Live HTTPS fetch** | Automated manifest resolution via GET requests to standard JSON locations, falling back to the JSON-RPC `tools/list` over Server-Sent Events (SSE) parsing. |
+| **Local / stdio MCP spawn** | Deep CLI integration invoking subprocesses and performing standard MCP JSON-RPC handshakes (e.g. `initialize`, `notifications/initialized`, `tools/list`) natively. |
+| **Policy per organization** | Broad override control system offering rule disablement, per-rule severity overrides, custom regular expressions, and capability-based blocking. |
+| **Scan history & diff UI** | Granular persistence tracking in SQLite with historical diff views to monitor server degradation or improvements across deployments. |
+| **SARIF / PDF / JSON export** | Native integrations ensuring findings are output into the precise schemas needed by code scanning systems, pipeline automation, or auditing managers. |
 
 ### Out of scope (current version)
 
 | Capability | Notes |
 |------------|-------|
-| Runtime tool execution | No dynamic fuzzing or invocation |
-| LLM semantic analysis | Deterministic rules only |
-| Multi-tenant auth / SSO | Single `default_org` today |
-| Web stdio spawn | Browser cannot launch local processes |
-| Fleet-wide dashboard | History is single-instance SQLite |
+| **Runtime tool execution** | Linejump performs no dynamic tool invocation, fuzzing of input APIs during runtime, or real-time proxy traffic analysis. |
+| **LLM semantic analysis** | Detections are built around highly tuned regular expressions, text normalizations, and heuristic patterns; external AI API calls for semantic classification are actively omitted. |
+| **Multi-tenant auth / SSO** | The current instance is scoped to a single `default_org` and does not yet handle enterprise RBAC, SAML, or SSO boundaries. |
+| **Web stdio spawn** | Web-based browsers cannot securely or architecturally spawn arbitrary local backend binaries; stdio execution is isolated to the CLI context. |
+| **Fleet-wide dashboard** | The underlying SQLite database is tightly scoped to the single host. A distributed Postgres or centralized fleet data aggregator is not natively supplied in the current open-source core. |
 
 ---
 
@@ -70,78 +74,77 @@ Linejump does **not** use autonomous LLM agents for detection. The engine is ful
 <p align="center"><strong>Figure 1 — Linejump system architecture</strong></p>
 
 ```mermaid
-flowchart LR
-    subgraph Presentation
-        LP[Landing Page]
-        SC[Scanner UI]
-        PO[Policy UI]
-        HI[History UI]
-        DF[Diff UI]
+flowchart TB
+    subgraph Clients["Clients"]
+        WEB["Web browser\n(React UI, TanStack Router)"]
+        CLI["Command Line Interface\n(tsx, Node child_process)"]
     end
 
-    subgraph ApplicationServer["Application server"]
-        SF[Server functions]
-        MF[MCP HTTP fetch]
-        AF[Attestation + save]
-        PF[Policy CRUD]
+    subgraph App["Linejump application (Node.js / Nitro)"]
+        UI["React Server Components"]
+        API["Server functions\n(Vite SSR, TanStack Start)"]
+        ENG["Detection engine v2.1\n(Deterministic Rules)"]
+        POL["Policy engine\n(Merge + Defaults)"]
+        DB[("SQLite Database\n(better-sqlite3)")]
     end
 
-    subgraph Core["Core libraries"]
-        DE[Detection engine 2.1]
-        DP[Default policy]
-        SR[SARIF generator]
-        CI[CI evaluator]
+    subgraph Inputs["Manifest sources"]
+        PASTE["Pasted JSON String"]
+        HTTP["HTTPS MCP endpoint"]
+        FILE["Local file / stdin"]
+        STDIO["Local Stdio MCP process"]
     end
 
-    subgraph Storage
-        SQL[(SQLite)]
-    end
-
-    subgraph External
-        MCP[MCP HTTPS server]
-    end
-
-    LP --> SC
-    SC --> SF
-    PO --> PF
-    HI --> SF
-    DF --> SF
-    SF --> DE
-    SF --> MF
-    MF --> MCP
-    SF --> AF
-    AF --> SQL
-    PF --> SQL
-    DE --> DP
-    SC --> SR
+  WEB --> UI
+  CLI --> ENG
+  UI --> API
+  API --> ENG
+  API --> DB
+  API --> HTTP
+  CLI --> FILE
+  CLI --> STDIO
+  PASTE --> UI
+  HTTP --> API
+  FILE --> ENG
+  STDIO --> ENG
+  POL --> ENG
+  ENG --> UI
+  ENG --> CLI
 ```
 
-### Component descriptions
+### Flow-by-flow explanation
 
-| Component | Path | Role |
-|-----------|------|------|
-| Landing page | `src/routes/index.tsx` | Marketing, product overview |
-| Scanner | `src/routes/app.tsx` | Primary scan UX, ATLAS, exports |
-| Policy | `src/routes/policy.tsx` | Org policy editor |
-| History | `src/routes/history.tsx` | Scan list, diff selection |
-| Diff | `src/routes/diff.tsx` | Two-scan comparison |
-| MCP fetch | `src/lib/mcp-fetch.functions.ts` | HTTPS manifest retrieval |
-| MCP stdio | `src/lib/mcp-stdio.ts` | CLI stdio handshake |
-| Detection engine | `src/lib/detection/engine.ts` | All scan rules |
-| Scanner API | `src/lib/mcp-scanner.ts` | Public scan + parse API |
-| Database | `src/lib/db.ts` | SQLite schema + queries |
-| SARIF | `src/lib/sarif.ts` | SARIF 2.1.0 export |
-| CLI | `cli/scan.ts` | Headless scanning |
+Linejump employs multiple ingress routes and execution pathways depending on the operational context. Below are the precise technical flows for the fundamental architectural behaviors:
 
-### Request lifecycle (web scan)
+1. **Web scan (Paste mechanism)**
+   - **Input:** A user directly pastes an MCP JSON payload (a complete manifest, a `tools/list` RPC response, or just an array of tools) into the React front-end text area on `/app`.
+   - **Normalization:** The browser triggers the `scanManifest` server function via TanStack Start over RPC. The server uses `parseManifestInput` (in `src/lib/mcp-scanner.ts`) to validate the string as JSON and flexibly unwrap nested structures (e.g., standardizing an array of tools or stripping out `result.tools` wrappers) to generate a canonical `McpManifest` object.
+   - **Policy Merging:** The system invokes `fetchPolicy` to query the SQLite backend (`linejump.sqlite`) for the `default_org`'s `ScannerPolicy`. The `mergePolicy` utility then natively shallow-merges the organization's settings (disabled rules, severity overrides, custom regexes) onto the `DEFAULT_SCANNER_POLICY`.
+   - **Scanning:** The `runDetectionEngine` takes the normalized manifest and the merged policy. It recursively walks every field of the manifest, building a list of findings and calculating a weighted confidence penalty score.
+   - **Attestation & Persistence:** Finally, `generateSignedReport` uses an RSA-SHA256 mechanism to cryptographically sign the result. It generates a unique random UUID, saves the raw input manifest, report JSON, and timestamp to the `scans` table in SQLite, and returns the response back to the client.
+   - **Rendering:** The React application re-hydrates, rendering the safety score out of 100, constructing the ATLAS attack-landscape map component, and displaying individual finding cards.
 
-1. User submits manifest or URL from `src/routes/app.tsx`.
-2. `fetchPolicy` loads org policy; `mergePolicy` applies defaults.
-3. For URL: `fetchMcpManifest` validates host (no private IPs), fetches JSON or RPC.
-4. `parseManifestInput` normalizes JSON shapes (manifest, tools/list, array).
-5. `scanManifest` → `runDetectionEngine` produces findings + score + coverage.
-6. `generateSignedReport` signs report, saves scan to SQLite, returns scan ID.
-7. UI renders ATLAS map, findings, score tooltip, export buttons.
+2. **Web scan (Live URL fetch)**
+   - **Input:** The user types an `https://` endpoint into the URL bar and submits.
+   - **Verification & Execution:** The `fetchMcpManifest` server function (`src/lib/mcp-fetch.functions.ts`) intercepts the request. It blocks `http://` schemes, `localhost`, and internal IPv4 network blocks (preventing Server-Side Request Forgery vulnerabilities).
+   - **Network Resolution:** It attempts a standard `GET` request. If the response content-type is strictly JSON, it parses it directly. If the endpoint responds as an MCP Server (using SSE streams), Linejump dynamically falls back to an RPC query POSTing a `{"method": "tools/list"}` payload and parses the returned JSON-RPC stream.
+   - **Conclusion:** The retrieved valid JSON string is passed to `parseManifestInput`, flowing back into the identical Normalization, Policy Merging, Scanning, and Persistence steps executed in a Paste context.
+
+3. **CLI execution (File or stdin)**
+   - **Input:** A user invokes `npm run scan -- ./manifest.json` or pipes standard input `cat file.json | npm run scan -- -`.
+   - **Loading:** The CLI script (`cli/scan.ts`) reads the file directly via `fs.readFileSync` into memory.
+   - **Policy & Evaluation:** It accesses the policy logic directly from SQLite or dynamically overrides it using `--policy ./policy.json`. It instantiates the detection engine, calculates the results directly in the Node.js runtime process (bypassing TanStack Start RPC overhead entirely), and constructs the final output format.
+   - **Formatting:** Findings are optionally reformatted natively into terminal tables, written to a SARIF 2.1.0 file (`--sarif`), or dumped to JSON (`--json`).
+
+4. **CLI execution (Stdio spawn)**
+   - **Input:** User invokes the CLI with `--stdio "npx -y @modelcontextprotocol/server-filesystem /tmp"`.
+   - **Process Spawn:** The `mcp-stdio.ts` utility breaks apart the command and spawns a native Node.js `child_process.spawn()`.
+   - **Handshake Protocol:** Linejump orchestrates a raw JSON-RPC state machine over standard input/output streams. It posts an `initialize` JSON-RPC message, waits for the server response, asserts `notifications/initialized`, and issues the core `tools/list` command.
+   - **Teardown & Analysis:** It parses the JSON Line streams from stdout, buffers the response into a consolidated manifest JSON structure, automatically kills the underlying child process to prevent resource leaks, and pushes the payload directly into the Detection Engine.
+
+5. **Diff and Scan History comparison**
+   - **Selection:** Within the React `/history` route, the application retrieves all stored database entries. Selecting two discrete scans passes their associated UUIDs to the `/diff` route (`?id1=&id2=`).
+   - **Evaluation:** The server pulls both persisted JSON manifest states, runs a deep visual property check, and renders a side-by-side comparative UI to highlight regressions, resolved errors, or newly introduced capabilities.
 
 ---
 
@@ -192,207 +195,185 @@ flowchart TD
     SCORE --> OUT[ScanReport]
 ```
 
-### Normalization layer
+### 1. Normalization Layer
+The core detection heuristic relies strictly on the `src/lib/detection/normalize.ts` service. Before any regular expression evaluation executes, raw input text undergoes rigorous mutations to defeat standard obfuscation and prompt-injection bypass forms. Transformations include:
+- **Unicode NFKC normalization:** To handle strange encodings correctly.
+- **Homoglyph folding:** Collapsing Cyrillic lookalikes back to their Latin counterparts (`a` vs `а`).
+- **Leetspeak expansion:** Transliterating standard substitutions (e.g. `!gn0re` -> `ignore`).
+- **Punctuation stripping and Spaced-letter collapse:** Defeating simple obfuscation strategies like `i g n o r e` dynamically translating back to `ignore`.
 
-`src/lib/detection/normalize.ts` applies transforms before pattern matching:
+### 2. Deep Text Fragment Analysis
+Text is evaluated by `scanTextFragment()` (`engine.ts`), breaking the text up to identify exact string matches or RegEx rules defining capabilities.
+It detects sophisticated obfuscation: Zero-width overrides (`\u200B`), invisible control characters, hidden ANSI escapes, hidden HTML comments/entities, Base64 embedded strings, and escaped character structures.
 
-- Unicode NFKC normalization
-- Homoglyph folding (Cyrillic → Latin)
-- Leetspeak expansion
-- Zero-width character removal
-- Punctuation stripping between tokens
-- Spaced-letter collapse (`i g n o r e` → `ignore`)
+### 3. Split-field Injection Detection
+Adversaries intentionally circumvent conventional static rules by breaking injection statements in half across discrete fields (e.g. splitting `ignore previous` such that `"ignore "` is the tool description, and `"previous"` is the schema title). Linejump executes a deep `scanSplitFieldInjection` mapping loop that structurally concatenates schemas and descriptions together securely to identify advanced evasion attempts.
 
-### Split-field detection
+### 4. Cross-tool Chain Modeling
+Linejump actively inspects the manifest to determine structural attack pathways that do not technically exist on an isolated tool level. `scanCrossTool()` maps tools dynamically, detecting when combinations enable severe exploits — for instance, highlighting a "Cross-tool exfiltration path" if one tool features `filesystem_read` heuristics and another provides `network_out` webhooks.
 
-Attackers may split injection phrases across `description` and `inputSchema` fields so per-field scanners miss them. `scanSplitFieldInjection` joins normalized fragments and flags phrases/patterns that only match combined text.
-
-### Rule categories
-
-See [Rule Catalog](./rule-catalog.md) for the complete ID list. Categories: injection, obfuscation, capability, schema, cross-tool chains, tool shadowing, resources, manifest.
-
-### Engine version
-
-`ENGINE_VERSION` in `src/lib/detection/engine.ts` (currently **2.1.0**) is stamped on every `ScanReport` as `engineVersion` and `coverage.rulesVersion`.
+### 5. Rule Weighting and Deduplication
+Findings are passed through an intelligent `dedupeFindings()` logic layer that squashes identical rules triggered multiple times for the exact same tool and evidence context. The system then merges policy decisions directly onto the payload, upgrading/downgrading severities and filtering skipped rules, before executing the confidence-multiplier scoring system (`computeScore`).
 
 ---
 
 ## Core features
 
 ### 1. Web scanner (`/app`)
-
-- Paste JSON or fetch HTTPS MCP endpoint
-- Real-time scan via server-side engine (no third-party API)
-- ATLAS attack-landscape map (`src/components/atlas-map.tsx`)
-- Safety score with explanatory tooltip
-- Finding cards: severity, category, ruleId, confidence, location, evidence
-- SARIF and PDF download after scan completes
+- **Dual execution paths:** Accepts raw JSON pasted text or fetches directly from Live HTTPS server endpoints dynamically.
+- **Immediate processing:** Operates entirely locally within the server component; does not rely on third-party API dependencies.
+- **ATLAS Attack Map (`src/components/atlas-map.tsx`):** A custom visual matrix grid automatically grouping findings by categorical attack surface domains.
+- **Rich finding cards:** Displays specific rule IDs, mapped confidence multipliers, and direct string evidence excerpts targeting exactly where a finding triggered.
+- **Native Exports:** Immediate downloads available for both SARIF formats and PDF generation post-scan.
 
 ### 2. Live MCP HTTP fetch
-
-`fetchMcpManifest` (`src/lib/mcp-fetch.functions.ts`):
-
-1. Validates URL (HTTPS only, blocks localhost/private ranges)
-2. Attempts GET for static JSON
-3. Falls back to JSON-RPC `tools/list` with SSE parsing
-4. Returns normalized manifest string
+Function (`src/lib/mcp-fetch.functions.ts`):
+1. **SSRF Guarding:** Performs DNS / IP regex checks blocking internal `127.0.0.1`, `10.x.x.x`, `192.168.x.x` blocks.
+2. **Payload Fetching:** Performs a raw `GET` HTTP fetch.
+3. **RPC Event Parsing:** Automatically parses line-delimited Server Sent Events payload responses if the server implements dynamic SSE `tools/list` behaviors.
+4. Returns the validated JSON payload into the main pipeline.
 
 ### 3. Detection engine
-
-40+ rules across injection, obfuscation, capabilities, schema, chains. Context-aware capability matching reduces false positives on standard tool names (`read_file`, etc.).
+40+ rigid heuristic and deterministic rule IDs handling obfuscation, privilege escalation limits, schema parsing structures (including validating combinations like `oneOf`/`anyOf`), and robust prompt injection strategies. Includes a complex `LEGIT_TOOL_NAME_RE` mapping protocol to purposefully silence false positives on inherently sensitive but broadly accepted tool titles (like `read_file`).
 
 ### 4. Policy system
+- **`disabledRules`:** An array of exact strings identifying specific rule IDs to purposefully omit.
+- **`severityOverrides`:** Mapping system elevating or silencing rules natively (e.g. promoting `medium` to `critical`).
+- **`blockedCapabilities`:** An enterprise string array that instantly escalates any rule text matches involving specific behaviors up to absolute `critical` blockers (e.g. blocking the capability `outbound network access`).
+- **`customRegexes`:** Custom internal validation definitions created per organization.
+Defaults operate dynamically in `src/lib/default-policy.ts`.
 
-- `disabledRules` — filter by rule ID
-- `severityOverrides` — per-rule severity
-- `blockedCapabilities` — keyword escalation to critical
-- `customRegexes` — org-specific patterns
-- Defaults in `src/lib/default-policy.ts`
+### 5. Scan history & Diff View
+- Automatically manages UUID tracking within the `scans` table (schema housing `server_url`, `manifest_json`, and serialized `report_json`).
+- Enables side-by-side UI views allowing direct visual comparison parsing via the `/history` & `/diff` routes to quickly identify delta shifts across deployments.
 
-### 5. Scan history
-
-- Stored in `scans` table with manifest + report JSON
-- History UI lists scans with score and timestamp
-- Select two scans → diff view
-
-### 6. Diff view
-
-- Side-by-side findings from two scan IDs
-- Query params: `?id1=&id2=`
-
-### 7. Attestation
-
-- RSA-SHA256 sign of report payload (`src/lib/attestation.ts`)
-- Demo-grade ephemeral keys (production should use KMS)
-- Scan ID generated per run
-
-### 8. CLI
-
-`cli/scan.ts` supports file, URL, stdin, `--stdio`, `--mcp-config`, `--json`, `--sarif`, `--ci`, `--policy`.
-
-### 9. CI evaluator
-
-`src/lib/ci-check.ts` — threshold checks on critical/high/medium counts and min score; markdown output for pipelines.
-
-### 10. SARIF export
-
-`src/lib/sarif.ts` — SARIF 2.1.0 with driver rules, results, safety score properties. Compatible with GitHub code scanning upload.
+### 6. Attestation
+The engine cryptographically validates the final output using RSA-SHA256 digital signing (`src/lib/attestation.ts`). Signatures utilize randomly generated ephemeral keys locally, allowing organizations to substitute custom external KMS infrastructures in true enterprise scenarios.
 
 ---
 
 ## Data model and persistence
 
-SQLite database: `linejump.sqlite`
+Linejump natively leverages `better-sqlite3` to interface with the local database instance `linejump.sqlite`.
 
-### Tables
+### Core Schemas
 
-**orgs**
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | TEXT PK | Organization ID (`default_org`) |
-| name | TEXT | Display name |
-
-**policies**
+**Table: `orgs`**
 
 | Column | Type | Description |
 |--------|------|-------------|
-| org_id | TEXT PK | FK to orgs |
-| config_json | TEXT | Serialized `ScannerPolicy` |
+| id | TEXT PK | Internal organization identifier (`default_org` natively) |
+| name | TEXT | Rendered display name |
 
-**scans**
+**Table: `policies`**
 
 | Column | Type | Description |
 |--------|------|-------------|
-| id | TEXT PK | Random scan ID |
-| org_id | TEXT | FK to orgs |
-| server_url | TEXT | Source URL if any |
-| manifest_json | TEXT | Input manifest |
-| report_json | TEXT | Full `ScanReport` |
-| created_at | DATETIME | Timestamp |
+| org_id | TEXT PK | Foreign Key relationship to the `orgs` table |
+| config_json | TEXT | Deeply serialized `ScannerPolicy` JSON string object |
+
+**Table: `scans`**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | A unique universally unique string for referencing scans |
+| org_id | TEXT | Foreign Key identifying ownership scope |
+| server_url | TEXT | Optional string identifying source derivation if captured over HTTPS |
+| manifest_json | TEXT | The raw input structure natively preserved in memory |
+| report_json | TEXT | Full serialized `ScanReport` object detailing scoring and findings |
+| created_at | DATETIME | Absolute record timestamp |
 
 ---
 
 ## API and server functions
 
-| Function | File | Method | Purpose |
+Linejump handles all data mutations locally via robust TanStack Start / Nitro server functions:
+
+| Function | File | Invocation | Detailed Purpose |
 |----------|------|--------|---------|
-| `fetchMcpManifest` | `mcp-fetch.functions.ts` | POST | HTTPS manifest fetch |
-| `fetchPolicy` | `policy.functions.ts` | GET | Load merged policy |
-| `savePolicyFn` | `policy.functions.ts` | POST | Save org policy |
-| `generateSignedReport` | `attestation.functions.ts` | POST | Sign + persist scan |
-| `fetchHistory` | `db.functions.ts` | GET | List scans |
-| `fetchScan` | `db.functions.ts` | GET | Single scan by ID |
+| `fetchMcpManifest` | `mcp-fetch.functions.ts` | POST | Exclusively executes network fetching for dynamic web scan HTTPS manifests, managing SSRF verification. |
+| `fetchPolicy` | `policy.functions.ts` | GET | Reads current configuration maps out of SQLite and parses them for standard policy merging limits. |
+| `savePolicyFn` | `policy.functions.ts` | POST | Executes raw parameterized `UPDATE/INSERT` statements into SQLite `policies`. |
+| `generateSignedReport` | `attestation.functions.ts` | POST | Generates an RSA PKCS1 structure, hashes the stringified report context, and persists the entity fully within SQLite. |
+| `fetchHistory` | `db.functions.ts` | GET | Fetches time-sorted metadata chunks to fulfill history pagination rendering. |
+| `fetchScan` | `db.functions.ts` | GET | Retrieves an absolute raw database entity for diffing or specific historical context display. |
 
 ---
 
 ## CLI and transports
 
-| Transport | Web | CLI | Implementation |
-|-----------|-----|-----|----------------|
-| Pasted JSON | ✓ | ✓ | `parseManifestInput` |
-| HTTPS URL | ✓ | ✓ | `fetch` / `fetchMcpManifest` |
-| Local file | — | ✓ | `fs.readFileSync` |
-| stdin | — | ✓ | `-` argument |
-| stdio MCP | — | ✓ | `mcp-stdio.ts` |
-| MCP config JSON | — | ✓ | `--mcp-config` + `--server` |
+Linejump provides robust native CLI capabilities built with `tsx` to interact with highly varied local ecosystems:
 
-Stdio handshake sequence:
+| Transport | Implementation Context | Web Support | CLI Support |
+|-----------|------------------------|-------------|-------------|
+| **Pasted JSON** | Orchestrated natively via `parseManifestInput`. | ✓ | ✓ |
+| **HTTPS URL** | Parsed directly via standard `fetch` APIs inside `fetchMcpManifest`. | ✓ | ✓ |
+| **Local file** | Ingested via native `fs.readFileSync` file streams natively bypassing web APIs. | — | ✓ |
+| **Standard input** | Evaluated continuously via `-` piped directly to `process.stdin`. | — | ✓ |
+| **Stdio MCP** | Handshakes orchestrated via `child_process.spawn()` streams (`mcp-stdio.ts`). | — | ✓ |
+| **MCP config JSON** | Dynamic retrieval of standard `mcp.json` context settings (Cursor/Claude format) using the `--mcp-config` switch logic. | — | ✓ |
 
-1. Spawn child process with `command` + `args`
-2. Send `initialize` JSON-RPC
-3. Send `notifications/initialized`
-4. Send `tools/list`
-5. Parse JSON lines from stdout → build manifest
+### Stdio Handshake Deep Dive (`mcp-stdio.ts`)
+1. Spawns standard OS native background process evaluating raw arbitrary command string.
+2. Posts `{"jsonrpc":"2.0", "id":1, "method":"initialize", "params":{...}}` string directly to `stdin`.
+3. Buffers and parses valid JSON return values.
+4. Responds identically with the required `"notifications/initialized"` structural pattern.
+5. Issues core standard `"tools/list"` query over standard RPC formats.
+6. Awaits, parses line-by-line responses, cleans the buffers, then natively executes process termination to exit successfully.
 
 ---
 
 ## Policy system
 
-Policy merge order (`mergePolicy` in `mcp-scanner.ts`):
+Policies guarantee enterprise noise-reduction against the core highly strict detection configurations.
 
-1. `DEFAULT_SCANNER_POLICY` base
-2. Organization policy from DB or CLI file
-3. `severityOverrides` shallow-merged (org wins)
+The structural evaluation relies exclusively on the `mergePolicy` helper in `src/lib/mcp-scanner.ts`. Deep inheritance merges behavior dynamically across the core standard:
+1. `DEFAULT_SCANNER_POLICY` establishes standard baseline operating modes.
+2. Overrides load sequentially from the SQLite Database (for web invocations) or static `policy.json` (for CLI executions).
+3. The `severityOverrides` logic explicitly relies on string-shallow merges to overwrite specific individual target rules directly.
+4. Custom overrides and capabilities immediately block scoring processing, applying a localized override flag (`requireApproval` controls internal tracking behavior).
 
-See [Tuning Guide](./tuning-guide.md) for enterprise scenarios.
+Refer to the formal [Tuning Guide](./tuning-guide.md) for deeply structured enterprise scenarios.
 
 ---
 
 ## Scoring model
+
+Scoring provides a strict quantitative analysis using dynamic confidence weighting thresholds to minimize false positive volatility.
 
 ```
 penalty = Σ (SEVERITY_WEIGHT[sev] × CONFIDENCE_MULTIPLIER[conf])
 score = clamp(100 - penalty, 0, 100)
 ```
 
-- One penalty per unique `(toolName, ruleId)` pair
-- Low-confidence findings reduce score impact
-- Info findings do not penalize
+**Mechanics:**
+- Deduplication runs specifically against exact discrete combinations of unique `(toolName, ruleId, location, evidence)` parameters. Identical recurring structural bugs in an isolated tool apply a scoring penalty exactly **once**.
+- Rule triggers calculate `severity` mapped to core values (`critical: 30`, `high: 15`, `medium: 6`, `low: 2`, `info: 0`).
+- This penalty natively multiplies dynamically against evaluated heuristics defining exactly how confident the engine views the violation (`high: 1`, `medium: 0.75`, `low: 0.45`).
+- Total evaluated deductions deduct mathematically from a perfect 100 limit scale baseline (Minimum cap is 0).
 
 ---
 
 ## Export formats
 
 ### SARIF 2.1.0
-
-- CLI: `npm run scan -- ./manifest.json --sarif out.sarif.json`
-- Web: **Download SARIF** button on scanner
-- Maps critical/high → error, medium → warning, low/info → note
+- Built extensively relying on `src/lib/sarif.ts`.
+- Evaluates completely valid structurally to the Standard format specification (`Static Analysis Results Interchange Format`).
+- Incorporates dynamic severity mapping rules: `critical/high` maps inherently to `error` limits. `medium` natively exports as `warning`, and lower limits cascade to standard `note` definitions.
+- Immediately compliant natively against standard GitHub / GitLab Advanced Security uploading patterns.
 
 ### PDF
-
-- Client-side jsPDF generation
-- Server name, scan ID, score, top 20 findings
+- Operates strictly locally within the front-end environment via `jsPDF`.
+- Embeds specific Server details, scan UUID tracking limits, safety totals natively formatted over dynamic canvas generations, logging exact textual representations of the topmost 20 evaluated findings correctly.
 
 ### JSON
-
-- Full `ScanReport` including `coverage` metadata
-- CLI: `--json`
+- Exports exact raw native JSON outputs derived from the core `ScanReport` TypeScript interface limits directly covering deep metrics mapping like structural `coverage` values (counting specific total evaluations on schemas and definitions directly).
 
 ---
 
 ## CI integration
+
+The Linejump ecosystem executes directly as a strict blocking pipeline evaluation layer:
 
 ```bash
 npm run scan -- ./manifest.json --ci \
@@ -401,9 +382,10 @@ npm run scan -- ./manifest.json --ci \
   --min-score=70
 ```
 
-Exit code `1` on threshold failure.
+- When limits fail structurally (e.g. finding a critical hit, or degrading below limits), the CLI script directly utilizes Node.js limits issuing `process.exit(1)`, cleanly blocking CI progression operations.
+- The `--ci` argument directly translates CLI console output structurally into Markdown tabular output optimized expressly for visual rendering environments inside standard runner logs.
 
-**GitHub Actions + SARIF:**
+**GitHub Actions Integration Example (SARIF Native Uploads):**
 
 ```yaml
 - run: npm run scan -- ./mcp.json --sarif linejump.sarif.json --ci
@@ -416,35 +398,37 @@ Exit code `1` on threshold failure.
 
 ## Security considerations
 
-| Topic | Mitigation |
+As an inherent security tool, Linejump enforces internal defensive design patterns:
+
+| Topic | Mitigation Pattern Applied |
 |-------|------------|
-| SSRF on URL fetch | HTTPS only; block private IP ranges |
-| Stdio spawn (CLI) | User explicitly provides command — runs with user permissions |
-| SQLite | Local file; no network exposure |
-| Signing keys | Ephemeral RSA per process — replace with KMS for production |
-| Data privacy | Scans run locally; no manifest sent to external AI APIs |
+| **SSRF network risks** | HTTP limits block custom private CIDR blocks completely, rejecting non-standard port behaviors implicitly over local networks directly. |
+| **CLI Remote execution** | Stdio CLI logic accepts specific text string boundaries but delegates binary spawning boundaries natively to local shell permission checks. Processes explicitly execute completely governed securely within the calling user's absolute RBAC scope natively. |
+| **Data leakage & SQLite** | Local storage explicitly avoids all dynamic sync functionality. Analytics remain offline entirely securely limiting external data leaks directly. |
+| **Payload Attestation Signing** | Engine issues standard localized Ephemeral RSA keys on application boundary limits. (Enterprise architectures substitute production local AWS KMS or external HashiCorp limits instead natively). |
+| **Third-party Data Analysis** | AI processing is wholly eliminated architecturally. Linejump guarantees zero network invocations natively towards any external third party LLM APIs guaranteeing rigid IP privacy on all scanned JSON objects. |
 
 ---
 
 ## Deployment
 
-### Docker
+### Containerization (Docker)
 
 ```bash
 docker compose up --build
 ```
+- Orchestrates specific limits locally establishing connections targeting internal port **3000**.
+- Architecturally creates internal dynamic volume maps referencing `linejump-data` enabling standard persistence across local deployments preventing data deletion cycles.
+- Image architecture leverages exact static builds native directly leveraging the hyper-optimized `Bun` containerization runtime definitions internally.
 
-- Port **3000**
-- Volume `linejump-data` for SQLite persistence
-- Bun runtime in container
-
-### Manual
+### Standard Manual Deployment
 
 ```bash
 npm install
 npm run build
 npm run preview
 ```
+- Compiles standard optimized native `dist/` directories strictly parsing against standard V8 definitions.
 
 ---
 
@@ -454,25 +438,28 @@ npm run preview
 npm test
 ```
 
-| Suite | File | Coverage |
+Testing leverages highly reliable `Vitest` testing architecture suites handling complex edge mappings:
+
+| Test Suite Scope | Test Path Location | Covered Functional Scope |
 |-------|------|----------|
-| Detection engine | `src/lib/detection/engine.test.ts` | Rules, split-field, policy, false positives |
-| SARIF | `src/lib/sarif.test.ts` | SARIF structure validation |
+| **Detection Evaluation Engine** | `src/lib/detection/engine.test.ts` | Evaluates native structural boundary checks, string normalization capabilities, split-field logic merging algorithms, enterprise policy cascade limits, and specific tool name heuristic evaluation false-positive limit mapping logic natively. |
+| **SARIF Validation Checks** | `src/lib/sarif.test.ts` | Strictly asserts generation patterns guaranteeing standard object properties output structural schemas perfectly identically mapping expected SARIF 2.1.0 output standards identically. |
 
 ---
 
 ## Conclusion
 
-Linejump provides a **deterministic, policy-tunable, CI-ready** static analysis layer for MCP server manifests. The architecture separates presentation (React UI, CLI), application services (server functions, fetch, persistence), and core detection (rule engine with normalization and split-field analysis).
+Linejump provides a heavily robust, highly deterministic, entirely offline-capable, and enterprise policy-tunable static analysis architectural layer strictly targeted natively at validating MCP server structures entirely before deployment.
 
-For enterprises, the recommended deployment pattern is:
+The structural system correctly segregates exact boundaries across presentation logic limits (React Native UI Components & terminal CLIs), data application orchestration (server boundary endpoints, fetch mechanics, and SQLite persistence APIs), and deeply optimized execution patterns directly residing internally (Rule parsing engines, specific algorithmic payload normalization structures, and cross-field structural combinations).
 
-1. **CI gate** — `npm run scan -- --ci --sarif` on every manifest change
-2. **Policy tuning** — start with defaults, disable noisy rules per org ([Tuning Guide](./tuning-guide.md))
-3. **Human review** — web scanner + PDF for vendor approval workflows
-4. **Complement runtime controls** — Linejump is SAST, not a substitute for execution sandboxing
+For structural enterprise organizations, standard recommended implementations natively align specifically toward:
+1. **Pipeline integration:** Direct implementations of `npm run scan -- --ci --sarif` limits embedded fully on standard PR verification boundaries.
+2. **Policy customization logic:** Standard evaluations begin leveraging local defaults cleanly, then progressively implementing `--policy` disabled flags targeting deeply noisy heuristics natively ([Tuning Guide](./tuning-guide.md)).
+3. **Auditor Manual Review:** Direct utilization of Web UI implementations directly paired against static generated PDF limit exports targeting standard corporate vendor compliance reviews efficiently.
+4. **Holistic Security integration:** Linejump explicitly operates directly as Static Application Security Testing (SAST). It fundamentally acts perfectly strictly complementing specific standard execution limits natively, avoiding standard sandbox execution limits dynamically entirely.
 
-Future enhancements (not in current release): multi-tenant auth, KMS signing, fleet dashboard, optional LLM-assisted review for ambiguous findings.
+Future structural roadmaps include strict limits expanding dynamic Enterprise mapping limits (e.g. robust multi-tenant authorization endpoints, advanced KMS hardware cryptographic signing logic mapping logic, and centralized distributed deployment UI fleet aggregation capabilities).
 
 ---
 
