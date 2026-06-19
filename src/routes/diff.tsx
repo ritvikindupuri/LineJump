@@ -243,7 +243,7 @@ function DiffPage() {
 
       <div className="mx-auto max-w-4xl px-6 py-12">
         <div className="flex flex-col gap-2 mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Semantic Scan Diff</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Scan Comparison</h1>
           <p className="text-muted-foreground text-sm flex items-center gap-2">
             Comparing <span className="font-medium text-foreground">{date1.toLocaleString()}</span>{" "}
             to <span className="font-medium text-foreground">{date2.toLocaleString()}</span>
@@ -324,7 +324,20 @@ function DiffPage() {
                 <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
-                <h2 className="text-xl font-medium">Findings Resolved</h2>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <h2 className="text-xl font-medium cursor-help decoration-dashed underline-offset-4 decoration-muted-foreground hover:underline">
+                        Findings Resolved
+                      </h2>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>
+                        These are potential security issues that were present in the previous scan but are no longer detected.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="flex flex-col gap-4">
                 {resolvedFindings.map((f) => (
