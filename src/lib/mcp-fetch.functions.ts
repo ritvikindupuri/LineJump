@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { safeFetch, SsrfError } from "./ssrf-guard";
 
 export type FetchSource = "json" | "tools/list";
 
@@ -8,73 +9,31 @@ export interface FetchManifestResult {
   raw: string;
 }
 
-function validateUrl(input: string): URL {
-  let urlString = input.trim();
-  if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) {
-    urlString = "https://" + urlString;
-  }
-
-  let u: URL;
-  try {
-    u = new URL(urlString);
-  } catch {
-    throw new Error("Invalid URL.");
-  }
-  if (u.protocol !== "https:") {
-    throw new Error("Only https URLs are allowed.");
-  }
-  // Basic SSRF guards: block obvious internal hosts.
-  const host = u.hostname.toLowerCase();
-  const blocked = ["localhost", "0.0.0.0", "127.0.0.1", "::1", "metadata.google.internal"];
-  if (blocked.includes(host)) throw new Error("Host is not allowed.");
-  if (
-    host.endsWith(".local") ||
-    host.startsWith("169.254.") ||
-    host.startsWith("10.") ||
-    host.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
-  ) {
-    throw new Error("Private network hosts are not allowed.");
-  }
-  return u;
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit, ms = 8000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal, redirect: "follow" });
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 export const fetchMcpManifest = createServerFn({ method: "POST" })
   .inputValidator((d: { url: string }) => {
     if (!d || typeof d.url !== "string") throw new Error("url required");
     return { url: d.url.trim() };
   })
   .handler(async ({ data }): Promise<FetchManifestResult> => {
-    const u = validateUrl(data.url);
-    const url = u.toString();
-
     // 1) Try a plain GET — works for static manifests, .well-known/mcp,
-    //    registry entries, GitHub raw files, etc.
+    //    registry entries, GitHub raw files, etc. safeFetch validates the
+    //    target, pins the connection IP, and re-checks every redirect hop.
     try {
-      const res = await fetchWithTimeout(url, {
+      const res = await safeFetch(data.url, {
         method: "GET",
         headers: { Accept: "application/json, text/plain;q=0.9, */*;q=0.5" },
       });
-      if (res.ok) {
-        const text = await res.text();
-        const trimmed = text.trim();
+      if (res.status >= 200 && res.status < 300) {
+        const trimmed = res.body.trim();
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
           // Looks like JSON — let the scanner parse and validate it.
-          return { source: "json", url, raw: text };
+          return { source: "json", url: res.finalUrl, raw: res.body };
         }
       }
-    } catch {
-      // fall through to JSON-RPC
+    } catch (e) {
+      // An unsafe target must abort the whole request — never fall through.
+      if (e instanceof SsrfError) throw e;
+      // Other GET failures (404, non-JSON, connection reset) fall through to RPC.
     }
 
     // 2) MCP Streamable HTTP: POST tools/list and synthesize a manifest.
@@ -84,7 +43,7 @@ export const fetchMcpManifest = createServerFn({ method: "POST" })
       method: "tools/list",
       params: {},
     });
-    const rpc = await fetchWithTimeout(url, {
+    const rpc = await safeFetch(data.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -93,11 +52,11 @@ export const fetchMcpManifest = createServerFn({ method: "POST" })
       },
       body: rpcBody,
     });
-    if (!rpc.ok) {
+    if (rpc.status < 200 || rpc.status >= 300) {
       throw new Error(`Server returned ${rpc.status} ${rpc.statusText}.`);
     }
-    const ct = rpc.headers.get("content-type") ?? "";
-    const text = await rpc.text();
+    const ct = rpc.headers["content-type"] ?? "";
+    const text = rpc.body;
 
     let parsed: unknown;
     if (ct.includes("text/event-stream")) {
@@ -134,14 +93,14 @@ export const fetchMcpManifest = createServerFn({ method: "POST" })
     }
     const tools = obj.result?.tools ?? [];
     const manifest = {
-      name: u.host,
+      name: new URL(rpc.finalUrl).host,
       transport: "http",
-      url,
+      url: rpc.finalUrl,
       tools,
     };
     return {
       source: "tools/list",
-      url,
+      url: rpc.finalUrl,
       raw: JSON.stringify(manifest, null, 2),
     };
   });
