@@ -77,7 +77,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 8000) {
 }
 
 export const fetchMcpManifest = createServerFn({ method: "POST" })
-  .inputValidator((d: { url: string }) => {
+  .validator((d: { url: string }) => {
     if (!d || typeof d.url !== "string") throw new Error("url required");
     return { url: d.url.trim() };
   })
