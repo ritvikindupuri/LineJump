@@ -15,15 +15,53 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      {/* Top half of the split circle (offset to the right, y-separated) */}
-      <path
-        d="M 10 18 C 10 11.5, 15.5 6, 22 6 C 28.5 6, 34 11.5, 34 18 Z"
+      <defs>
+        {/* Transparent LED cutout masks */}
+        <mask id="top-drawer-mask">
+          <rect x="9" y="10" width="22" height="5" rx="1.5" fill="white" />
+          <circle cx="13" cy="12.5" r="1.2" fill="black" />
+        </mask>
+        <mask id="mid-drawer-mask">
+          <rect x="14" y="17.5" width="22" height="5" rx="1.5" fill="white" />
+          <circle cx="18" cy="20" r="1.2" fill="black" />
+        </mask>
+        <mask id="bot-drawer-mask">
+          <rect x="9" y="25" width="22" height="5" rx="1.5" fill="white" />
+          <circle cx="13" cy="27.5" r="1.2" fill="black" />
+        </mask>
+      </defs>
+
+      {/* Top Server Drawer (Centered) */}
+      <rect
+        x="9"
+        y="10"
+        width="22"
+        height="5"
+        rx="1.5"
         fill="currentColor"
+        mask="url(#top-drawer-mask)"
       />
-      {/* Bottom half of the split circle (offset to the left, y-separated) */}
-      <path
-        d="M 6 22 C 6 28.5, 11.5 34, 18 34 C 24.5 34, 30 28.5, 30 22 Z"
+
+      {/* Middle Server Drawer (Shifted/Jumped to the right) */}
+      <rect
+        x="14"
+        y="17.5"
+        width="22"
+        height="5"
+        rx="1.5"
         fill="currentColor"
+        mask="url(#mid-drawer-mask)"
+      />
+
+      {/* Bottom Server Drawer (Centered) */}
+      <rect
+        x="9"
+        y="25"
+        width="22"
+        height="5"
+        rx="1.5"
+        fill="currentColor"
+        mask="url(#bot-drawer-mask)"
       />
     </svg>
   );
