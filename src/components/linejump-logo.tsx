@@ -15,46 +15,39 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      <defs>
-        {/* Vibrant copper-orange gradient for the jumping arc */}
-        <linearGradient id="lj-accent-grad" x1="12" y1="24" x2="28" y2="24" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FF7E5F" />
-          <stop offset="100%" stopColor="#FEB47B" />
-        </linearGradient>
-      </defs>
-      {/* Bold horizontal track line segments (theme-adaptive currentColor) */}
+      {/* Bold horizontal track line segments (theme-adaptive currentColor with subtle opacity) */}
       <path
         d="M 6 24 L 15 24"
         stroke="currentColor"
         strokeWidth="3.5"
         strokeLinecap="round"
-        opacity="0.85"
+        opacity="0.25"
       />
       <path
         d="M 25 24 L 34 24"
         stroke="currentColor"
         strokeWidth="3.5"
         strokeLinecap="round"
-        opacity="0.85"
+        opacity="0.25"
       />
 
-      {/* Elegant Bezier arc representing the jump path (Vibrant copper-orange gradient) */}
+      {/* Elegant Bezier arc representing the jump path (monochrome currentColor) */}
       <path
         d="M 13 24 C 13 10, 27 10, 27 24"
-        stroke="url(#lj-accent-grad)"
-        strokeWidth="4"
+        stroke="currentColor"
+        strokeWidth="4.2"
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* Small motion trail under-arc */}
+      {/* Small motion trail under-arc (subtle opacity) */}
       <path
         d="M 16 24 C 16 16, 24 16, 24 24"
-        stroke="url(#lj-accent-grad)"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         fill="none"
-        opacity="0.4"
+        opacity="0.2"
       />
 
       {/* Glowing packet node at the peak of the jump */}
@@ -62,7 +55,7 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
         cx="20"
         cy="10"
         r="3.5"
-        fill="#FFD200"
+        fill="currentColor"
       />
     </svg>
   );
