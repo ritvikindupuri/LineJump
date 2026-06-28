@@ -15,47 +15,35 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      {/* Three vertical anchor bars (representing the line structure) */}
-      {/* Left Anchor */}
+      {/* Horizontal baseline segments with a gap (theme-adaptive currentColor with subtle opacity) */}
       <line
-        x1="12"
-        y1="30"
-        x2="12"
-        y2="20"
+        x1="6"
+        y1="22"
+        x2="15"
+        y2="22"
         stroke="currentColor"
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinecap="round"
+        opacity="0.3"
       />
-      {/* Right Anchor */}
       <line
-        x1="28"
-        y1="30"
-        x2="28"
-        y2="20"
+        x1="25"
+        y1="22"
+        x2="34"
+        y2="22"
         stroke="currentColor"
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinecap="round"
-      />
-      {/* Center Jump Anchor (Elevated, representing the Leap) */}
-      <line
-        x1="20"
-        y1="18"
-        x2="20"
-        y2="8"
-        stroke="currentColor"
-        strokeWidth="4"
-        strokeLinecap="round"
+        opacity="0.3"
       />
 
-      {/* Dotted/dashed curve tracing the Leap path */}
+      {/* Bold, minimalist lightning jump bolt bridging the gap */}
       <path
-        d="M 12 20 C 12 10, 20 2, 20 8 C 20 14, 28 10, 28 20"
+        d="M 23 8 L 14 22 L 26 22 L 17 32"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="4.5"
         strokeLinecap="round"
-        strokeDasharray="2 3"
-        fill="none"
-        opacity="0.7"
+        strokeLinejoin="round"
       />
     </svg>
   );
