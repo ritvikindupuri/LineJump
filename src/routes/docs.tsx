@@ -114,6 +114,10 @@ function DocsPage() {
     { id: "what-is-mcp", label: "What is MCP?", icon: BookOpen },
     { id: "getting-started", label: "Getting Started", icon: Terminal },
     { id: "scanning", label: "Scanning Manifests", icon: FileSearch },
+    { id: "safe-fetch", label: "SafeFetch Inspector", icon: Shield },
+    { id: "policy-packs", label: "Policy Packs & BOM", icon: Library },
+    { id: "attack-paths", label: "Attack Path Modeling", icon: GitBranch },
+    { id: "drift-governance", label: "Drift Governance", icon: Shield },
     { id: "findings", label: "Understanding Findings", icon: Shield },
     { id: "ci-pipeline", label: "CI Pipeline Integration", icon: GitBranch },
     { id: "catalog", label: "Server Catalog", icon: Library },
@@ -206,6 +210,74 @@ function DocsPage() {
                     The scanner accepts: full MCP server manifests, <code>tools/list</code> response objects,
                     bare arrays of tool definitions, or single tool objects.
                   </p>
+                </div>
+              </Section>
+
+              <Section title="SafeFetch Inspector" id="safe-fetch">
+                <div className="prose-sm max-w-none text-muted-foreground space-y-4">
+                  <p>
+                    LineJump protects your network infrastructure against Server-Side Request Forgery (SSRF) and DNS pinning attacks using the <strong>SafeFetch Inspector</strong>.
+                  </p>
+                  <h4 className="font-medium text-foreground">Detailed Safety Checklist</h4>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li><strong>DNS Resolution Auditing</strong>: Automatically resolves URLs to their raw IPv4 addresses before executing the query.</li>
+                    <li><strong>Manual Redirect Tracing</strong>: Manually follows redirect headers (up to 5 hops) rather than allowing the browser/process to follow blindly. It checks DNS resolved hosts for SSRF targets on every hop.</li>
+                    <li><strong>IP Subnet Blocks</strong>: Instantly terminates the fetch if target resolves to private loopbacks (`127.0.0.1`), LAN subnets (`10.x.x.x`, `192.168.x.x`), or cloud provider metadata endpoints (`169.254.169.254`).</li>
+                    <li><strong>TLS Summarization</strong>: Captures connection protocol and verification issuer metadata for static and remote servers.</li>
+                  </ul>
+                </div>
+              </Section>
+
+              <Section title="Policy Packs & BOM" id="policy-packs">
+                <div className="prose-sm max-w-none text-muted-foreground space-y-4">
+                  <p>
+                    Security policies are not one-size-fits-all. LineJump includes toggleable <strong>Policy Packs</strong> and detailed <strong>BOM Sheets</strong> to control rulesets on-the-fly.
+                  </p>
+                  <h4 className="font-medium text-foreground">Available Rule Profiles</h4>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li><strong>Default Profile</strong>: Baseline social engineering and command injection tests.</li>
+                    <li><strong>Strict Enterprise</strong>: Escalates dangerous combinations and subprocess commands (e.g. `exec`, `spawn`) to `critical` failures.</li>
+                    <li><strong>Developer Friendly</strong>: Downgrades warning thresholds to prevent false positives during active dev stages.</li>
+                    <li><strong>No External Network</strong>: Automatically flags tools that mention network endpoints, requests, webhooks, or fetching.</li>
+                    <li><strong>Local Filesystem Only</strong>: Prohibits outbound internet indicators but permits local filesystem read tools.</li>
+                  </ul>
+                  <h4 className="font-medium text-foreground">MCP-BOM (Bill of Materials)</h4>
+                  <p>
+                    Compiles a complete structured software inventory of the MCP server, showing tool names, active scopes, target domains, tool safety scores, and a tamper-evident hash checksum for each tool schema.
+                  </p>
+                </div>
+              </Section>
+
+              <Section title="Attack Path Modeling" id="attack-paths">
+                <div className="prose-sm max-w-none text-muted-foreground space-y-4">
+                  <p>
+                    Rather than logging single flat rule failures, LineJump evaluates the risk of **capability chaining**—where the model combines innocent tools to perform malicious operations.
+                  </p>
+                  <h4 className="font-medium text-foreground">Dynamic Exploit Flow Maps</h4>
+                  <p>
+                    If a server exposes both a reader tool (such as database query, files scrapers) and an outbound writer/sender (such as emails, webhook POST, HTTP request), LineJump constructs a directional Attack Path Graph:
+                  </p>
+                  <pre className="overflow-x-auto rounded-md bg-muted/50 p-4 text-[11px] leading-relaxed font-mono">
+                    {"LLM Host Client --(reads)--> Reader Tool --(payload chain)--> Sender Tool --(egress)--> Outbound Destination"}
+                  </pre>
+                  <p>
+                    This modeling visualizes the exact data exfiltration paths a compromised or injected model would attempt to exploit.
+                  </p>
+                </div>
+              </Section>
+
+              <Section title="Drift Governance" id="drift-governance">
+                <div className="prose-sm max-w-none text-muted-foreground space-y-4">
+                  <p>
+                    In enterprise environments, what matters is **what changed since the last review**. The **Drift Governance** panel acts as a change approval gate.
+                  </p>
+                  <h4 className="font-medium text-foreground">Change Approval Gates Flow</h4>
+                  <ol className="list-decimal pl-5 space-y-2">
+                    <li><strong>Initial Signature</strong>: When an MCP server is approved, the security reviewer signs the manifest, saving its hash to the SQLite `manifest_approvals` table.</li>
+                    <li><strong>Drift Detection</strong>: When a re-scan or proxy request is executed, the schema is compared line-by-line with the approved version.</li>
+                    <li><strong>Diff risk reporting</strong>: The console displays a detailed diff of added tools, removed parameters, or modified descriptions.</li>
+                    <li><strong>Sign-off approvals</strong>: Reviewers sign the drifted configuration to authorize it in production. Pinned tool proxy warnings bypass approved versions automatically.</li>
+                  </ol>
                 </div>
               </Section>
 

@@ -1,3 +1,4 @@
+
 export type RiskSeverity = "critical" | "high" | "medium" | "low" | "info";
 
 export interface Finding {
@@ -26,12 +27,45 @@ export interface McpManifest {
   [k: string]: unknown;
 }
 
+export interface AttackPathNode {
+  id: string;
+  label: string;
+  type: "client" | "tool" | "risk" | "egress";
+  details?: string;
+}
+
+export interface AttackPathEdge {
+  from: string;
+  to: string;
+  label?: string;
+  severity?: RiskSeverity;
+}
+
+export interface AttackPathGraph {
+  nodes: AttackPathNode[];
+  edges: AttackPathEdge[];
+}
+
+export interface McpBomItem {
+  name: string;
+  type: "tool" | "prompt" | "resource";
+  description: string;
+  capabilities: string[];
+  externalDomains: string[];
+  approvedHash: string;
+  safetyScore: number;
+}
+
 export interface ScanReport {
   serverName: string;
   toolCount: number;
   scannedAt: string;
   findings: Finding[];
   score: number; // 0-100, higher = safer
+  policyPack: string;
+  attackPath: AttackPathGraph;
+  bom: McpBomItem[];
+  fetchReport?: any;
 }
 
 // eslint-disable-next-line no-control-regex
@@ -105,7 +139,7 @@ function lower(s: string | undefined) {
   return (s ?? "").toLowerCase();
 }
 
-function scanText(text: string, toolName: string | undefined, category: string): Finding[] {
+export function scanText(text: string, toolName: string | undefined, category: string): Finding[] {
   const findings: Finding[] = [];
   if (!text) return findings;
   const lc = text.toLowerCase();
@@ -258,16 +292,165 @@ function scanCrossTool(tools: McpTool[]): Finding[] {
   return findings;
 }
 
-const SEVERITY_WEIGHT: Record<RiskSeverity, number> = {
-  critical: 30,
-  high: 15,
-  medium: 6,
-  low: 2,
-  info: 0,
+const SEVERITY_WEIGHT: Record<string, Record<RiskSeverity, number>> = {
+  default: { critical: 35, high: 15, medium: 6, low: 2, info: 0 },
+  strict: { critical: 60, high: 30, medium: 15, low: 5, info: 0 },
+  "dev-friendly": { critical: 15, high: 5, medium: 2, low: 0, info: 0 },
+  "no-network": { critical: 40, high: 20, medium: 8, low: 2, info: 0 },
+  "local-only": { critical: 40, high: 20, medium: 8, low: 2, info: 0 },
 };
 
-export function scanManifest(manifest: McpManifest): ScanReport {
-  const findings: Finding[] = [];
+function computeToolHash(t: McpTool): string {
+  const str = `${t.name ?? ""}-${t.description ?? ""}-${JSON.stringify(t.inputSchema ?? {})}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return "h-" + Math.abs(hash).toString(16);
+}
+
+function compileMcpBom(manifest: McpManifest, findings: Finding[]): McpBomItem[] {
+  const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
+  return tools.map((t) => {
+    const desc = t.description ?? "";
+    const name = t.name ?? "unnamed";
+    
+    // Detect capabilities
+    const capabilities: string[] = [];
+    if (/read|get|file/i.test(`${name} ${desc}`)) capabilities.push("Read access");
+    if (/write|post|send|webhook|http|request/i.test(`${name} ${desc}`)) capabilities.push("Write / Send access");
+    if (/shell|exec|spawn|bash/i.test(`${name} ${desc}`)) capabilities.push("Subprocess execution");
+    if (/env|secret|token|password|key/i.test(`${name} ${desc}`)) capabilities.push("Secrets / Config access");
+    
+    // Extract domain matches
+    const domains: string[] = [];
+    const urlMatches = desc.match(/https?:\/\/[a-zA-Z0-9.-]+/g);
+    if (urlMatches) {
+      for (const url of urlMatches) {
+        try {
+          domains.push(new URL(url).hostname);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Calc safety score per tool
+    const toolFindings = findings.filter((f) => f.toolName === name);
+    let penalty = 0;
+    for (const f of toolFindings) {
+      if (f.severity === "critical") penalty += 35;
+      else if (f.severity === "high") penalty += 15;
+      else if (f.severity === "medium") penalty += 6;
+      else if (f.severity === "low") penalty += 2;
+    }
+    const toolScore = Math.max(0, 100 - penalty);
+
+    return {
+      name,
+      type: "tool",
+      description: desc,
+      capabilities,
+      externalDomains: Array.from(new Set(domains)),
+      approvedHash: computeToolHash(t),
+      safetyScore: toolScore,
+    };
+  });
+}
+
+function compileAttackPathGraph(manifest: McpManifest, findings: Finding[]): AttackPathGraph {
+  const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
+  const nodes: AttackPathNode[] = [
+    { id: "client", label: "LLM Client Host", type: "client", details: "Local User Agent (Claude / Cursor)" }
+  ];
+  const edges: AttackPathEdge[] = [];
+
+  const readers = tools.filter((t) =>
+    /read|get|list|load|fetch|query|search/i.test(`${t.name ?? ""} ${t.description ?? ""}`),
+  );
+  const senders = tools.filter((t) =>
+    /(send|post|publish|upload|write|email|webhook|http|fetch|notify|export)/i.test(
+      `${t.name ?? ""} ${t.description ?? ""}`,
+    ),
+  );
+
+  // Add tool nodes
+  for (const t of tools) {
+    const tName = t.name ?? "unnamed";
+    nodes.push({
+      id: `tool-${tName}`,
+      label: tName,
+      type: "tool",
+      details: t.description ?? "Exposes schema capabilities to the model."
+    });
+  }
+
+  // Draw client connections
+  for (const r of readers) {
+    edges.push({
+      from: "client",
+      to: `tool-${r.name}`,
+      label: "Queries resource",
+      severity: "info"
+    });
+  }
+
+  // Draw exfiltration vectors if client connects to both
+  if (readers.length > 0 && senders.length > 0) {
+    nodes.push({
+      id: "egress",
+      label: "Outbound Egress",
+      type: "egress",
+      details: "Outbound remote network vector."
+    });
+
+    for (const r of readers) {
+      for (const s of senders) {
+        edges.push({
+          from: `tool-${r.name}`,
+          to: `tool-${s.name}`,
+          label: "Chained payload flow",
+          severity: "high"
+        });
+      }
+    }
+
+    for (const s of senders) {
+      edges.push({
+        from: `tool-${s.name}`,
+        to: "egress",
+        label: "Exfiltrates content",
+        severity: "critical"
+      });
+    }
+  }
+
+  // Inject risk nodes
+  const injectionFindings = findings.filter((f) => f.category === "Prompt injection");
+  for (const f of injectionFindings) {
+    if (f.toolName) {
+      nodes.push({
+        id: `risk-inject-${f.toolName}`,
+        label: "Metadata Hijack Vector",
+        type: "risk",
+        details: "Hijack model prompt instructions via description."
+      });
+      edges.push({
+        from: `risk-inject-${f.toolName}`,
+        to: `tool-${f.toolName}`,
+        label: "Injects model control",
+        severity: f.severity
+      });
+    }
+  }
+
+  return { nodes, edges };
+}
+
+export function scanManifest(manifest: McpManifest, policyPack = "default"): ScanReport {
+  let findings: Finding[] = [];
   const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
 
   // Server-level description if present
@@ -291,37 +474,71 @@ export function scanManifest(manifest: McpManifest): ScanReport {
 
   findings.push(...scanCrossTool(tools));
 
-  if (tools.length === 0) {
-    findings.push({
-      id: id(),
-      severity: "info",
-      category: "Manifest",
-      title: "No tools found",
-      detail:
-        "The manifest does not declare any tools. Confirm you pasted the tools/list response or full server manifest.",
-    });
-  }
-
   // Dedupe by toolName+title
   const seen = new Set<string>();
-  const deduped = findings.filter((f) => {
+  let deduped = findings.filter((f) => {
     const k = `${f.toolName ?? ""}::${f.title}::${f.evidence ?? ""}`;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
 
-  const penalty = deduped.reduce((acc, f) => acc + SEVERITY_WEIGHT[f.severity], 0);
+  // Apply Policy Pack adjustments
+  if (policyPack === "strict") {
+    deduped = deduped.map((f) => {
+      if (f.category.includes("exfiltration") || f.category.includes("DLP")) {
+        return { ...f, severity: "critical", detail: `[STRICT POLICY ENFORCED] ${f.detail}` };
+      }
+      if (f.title.includes("execution") || f.title.includes("shell")) {
+        return { ...f, severity: "critical", detail: `[STRICT POLICY ENFORCED] Privileged command executions are strictly blocked.` };
+      }
+      return f;
+    });
+  } else if (policyPack === "no-network") {
+    deduped = deduped.map((f) => {
+      if (f.evidence && /(http|webhook|fetch|send|post)/i.test(f.evidence)) {
+        return { ...f, severity: "critical", detail: `[NO-NETWORK POLICY] Outbound network indicators are prohibited in this pack: ${f.detail}` };
+      }
+      return f;
+    });
+  } else if (policyPack === "local-only") {
+    deduped = deduped.map((f) => {
+      if (f.evidence && /(http|webhook|fetch|send|post)/i.test(f.evidence)) {
+        return { ...f, severity: "critical", detail: `[LOCAL-ONLY POLICY] Network communication is blocked in this profile.` };
+      }
+      if (f.title.includes("filesystem")) {
+        return { ...f, severity: "info", detail: `[LOCAL-ONLY POLICY] Filesystem access is pre-authorized inside this segment.` };
+      }
+      return f;
+    });
+  } else if (policyPack === "dev-friendly") {
+    // Map severities down
+    deduped = deduped.map((f) => {
+      let severity: RiskSeverity = f.severity;
+      if (f.severity === "critical") severity = "high";
+      else if (f.severity === "high") severity = "medium";
+      else if (f.severity === "medium") severity = "low";
+      return { ...f, severity };
+    });
+  }
+
+  const weights = SEVERITY_WEIGHT[policyPack] || SEVERITY_WEIGHT.default;
+  const penalty = deduped.reduce((acc, f) => acc + weights[f.severity], 0);
   const score = Math.max(0, Math.min(100, 100 - penalty));
+
+  const sortedFindings = deduped.sort(
+    (a, b) => weights[b.severity] - weights[a.severity]
+  );
 
   return {
     serverName: typeof manifest.name === "string" ? manifest.name : "Unnamed MCP server",
     toolCount: tools.length,
     scannedAt: new Date().toISOString(),
-    findings: deduped.sort(
-      (a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity],
-    ),
+    findings: sortedFindings,
     score,
+    policyPack,
+    attackPath: compileAttackPathGraph(manifest, sortedFindings),
+    bom: compileMcpBom(manifest, sortedFindings)
   };
 }
 

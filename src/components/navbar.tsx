@@ -17,7 +17,7 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-          <LinejumpWordmark height={16} animated />
+          <LinejumpWordmark height={16} />
         </Link>
         <nav className="hidden items-center gap-6 text-sm md:flex">
           <Link to="/app" className="text-muted-foreground transition-colors hover:text-foreground">

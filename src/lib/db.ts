@@ -84,6 +84,49 @@ function initSchema(db: Database): void {
       verified INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS pinned_tools (
+      id TEXT PRIMARY KEY,
+      server_name TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      schema_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(server_name, tool_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS quarantined_responses (
+      id TEXT PRIMARY KEY,
+      server_name TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      original_content TEXT NOT NULL,
+      sanitized_content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'quarantined',
+      reason TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS proxy_logs (
+      id TEXT PRIMARY KEY,
+      server_name TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      arguments TEXT NOT NULL,
+      response TEXT NOT NULL,
+      status TEXT NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS manifest_approvals (
+      id TEXT PRIMARY KEY,
+      server_name TEXT NOT NULL,
+      manifest_hash TEXT NOT NULL,
+      manifest_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'approved',
+      approved_at TEXT NOT NULL DEFAULT (datetime('now')),
+      approved_by TEXT NOT NULL DEFAULT 'security_admin'
+    );
   `);
 }
 
@@ -236,3 +279,82 @@ export async function upvoteCatalogEntry(id: string): Promise<void> {
   const db = await getDb();
   db.prepare("UPDATE catalog_entries SET upvotes = upvotes + 1 WHERE id = ?").run(id);
 }
+
+export async function logProxyCall(serverName: string, toolName: string, args: string, response: string, status: string, durationMs: number): Promise<void> {
+  const db = await getDb();
+  db.prepare("INSERT INTO proxy_logs (id, server_name, tool_name, arguments, response, status, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(crypto.randomUUID(), serverName, toolName, args, response, status, durationMs);
+}
+
+export async function getProxyLogs(limit = 100): Promise<any[]> {
+  const db = await getDb();
+  return db.prepare("SELECT * FROM proxy_logs ORDER BY created_at DESC LIMIT ?").all(limit) as any[];
+}
+
+export async function getPinnedTools(serverName?: string): Promise<any[]> {
+  const db = await getDb();
+  if (serverName) {
+    return db.prepare("SELECT * FROM pinned_tools WHERE server_name = ?").all(serverName) as any[];
+  }
+  return db.prepare("SELECT * FROM pinned_tools ORDER BY created_at DESC").all() as any[];
+}
+
+export async function pinTool(serverName: string, toolName: string, description: string, schemaJson: string, status: string): Promise<void> {
+  const db = await getDb();
+  const existing = db.prepare("SELECT id FROM pinned_tools WHERE server_name = ? AND tool_name = ?").get(serverName, toolName) as any;
+  if (existing) {
+    db.prepare("UPDATE pinned_tools SET description = ?, schema_json = ?, status = ? WHERE id = ?")
+      .run(description, schemaJson, status, existing.id);
+  } else {
+    db.prepare("INSERT INTO pinned_tools (id, server_name, tool_name, description, schema_json, status) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(crypto.randomUUID(), serverName, toolName, description, schemaJson, status);
+  }
+}
+
+export async function approvePinnedTool(id: string): Promise<void> {
+  const db = await getDb();
+  db.prepare("UPDATE pinned_tools SET status = 'approved' WHERE id = ?").run(id);
+}
+
+export async function blockPinnedTool(id: string): Promise<void> {
+  const db = await getDb();
+  db.prepare("UPDATE pinned_tools SET status = 'blocked' WHERE id = ?").run(id);
+}
+
+export async function getQuarantinedResponses(): Promise<any[]> {
+  const db = await getDb();
+  return db.prepare("SELECT * FROM quarantined_responses ORDER BY created_at DESC").all() as any[];
+}
+
+export async function quarantineResponse(serverName: string, toolName: string, originalContent: string, sanitizedContent: string, reason: string): Promise<string> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  db.prepare("INSERT INTO quarantined_responses (id, server_name, tool_name, original_content, sanitized_content, reason) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(id, serverName, toolName, originalContent, sanitizedContent, reason);
+  return id;
+}
+
+export async function releaseQuarantine(id: string): Promise<void> {
+  const db = await getDb();
+  db.prepare("UPDATE quarantined_responses SET status = 'released' WHERE id = ?").run(id);
+}
+
+export async function getManifestApprovals(serverName?: string): Promise<any[]> {
+  const db = await getDb();
+  if (serverName) {
+    return db.prepare("SELECT * FROM manifest_approvals WHERE server_name = ? ORDER BY approved_at DESC").all(serverName) as any[];
+  }
+  return db.prepare("SELECT * FROM manifest_approvals ORDER BY approved_at DESC").all() as any[];
+}
+
+export async function approveManifest(serverName: string, manifestHash: string, manifestJson: string, approvedBy = "security_admin"): Promise<void> {
+  const db = await getDb();
+  db.prepare("INSERT INTO manifest_approvals (id, server_name, manifest_hash, manifest_json, status, approved_by) VALUES (?, ?, ?, ?, 'approved', ?)")
+    .run(crypto.randomUUID(), serverName, manifestHash, manifestJson, approvedBy);
+}
+
+export async function getLatestApprovedManifest(serverName: string): Promise<any | null> {
+  const db = await getDb();
+  return db.prepare("SELECT * FROM manifest_approvals WHERE server_name = ? ORDER BY approved_at DESC LIMIT 1").get(serverName) as any || null;
+}
+

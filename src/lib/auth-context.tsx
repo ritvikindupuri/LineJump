@@ -24,10 +24,34 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+import { getCurrentUser } from "./auth.functions";
+
 export function AuthProvider({ children, initialUser, initialToken }: { children: ReactNode; initialUser: User | null; initialToken: string | null }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [token, setToken] = useState<string | null>(initialToken);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const storedToken = localStorage.getItem("lj-token");
+        if (storedToken) {
+          const res = await getCurrentUser({ data: { token: storedToken } });
+          if (res.user) {
+            setUser(res.user as any);
+            setToken(storedToken);
+          } else {
+            localStorage.removeItem("lj-token");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore session", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    restoreSession();
+  }, []);
 
   const setAuth = (u: User | null, t: string | null) => {
     setUser(u);
