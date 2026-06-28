@@ -18,13 +18,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Linejump — The MCP Security Wrapper & Proxy" },
+      { title: "LineJump — The MCP Security Wrapper & Proxy" },
       {
         name: "description",
         content:
           "Secure Model Context Protocol LLM apps. Enforce trust-on-first-use instructions, sanitization, and data loss prevention via a local stdio proxy.",
       },
-      { property: "og:title", content: "Linejump — The MCP Security Wrapper & Proxy" },
+      { property: "og:title", content: "LineJump — The MCP Security Wrapper & Proxy" },
       {
         property: "og:description",
         content:
@@ -112,7 +112,7 @@ function Hero() {
             {...fadeUp}
             className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-muted-foreground"
           >
-            Linejump wraps downstream MCP servers in a real-time JSON-RPC stdio proxy,
+            LineJump wraps downstream MCP servers in a real-time JSON-RPC stdio proxy,
             intercepting line-jumping attacks, scanning input schemas, sanitizing ANSI escapes,
             and gating untested server capabilities before they reach your LLM.
           </motion.p>
@@ -166,9 +166,9 @@ function ProxyVisualization() {
               <pre className="mt-5 overflow-x-auto whitespace-pre text-left font-mono text-[12.5px] leading-relaxed text-foreground/90">
 {`▸ Spawning downstream MCP server [sqlite-db] …
 ▸ Intercepting JSON-RPC stdio channel
-
+ 
   [TOFU PIN] ℹ  Tool "write_query" registered as PENDING. Redacted description.
-                ↳ "Awaiting security approval in the Linejump Dashboard"
+                ↳ "Awaiting security approval in the LineJump Dashboard"
 
   [DLP CHECK] ⚠  Blocked call "execute_sql"
                 ↳ Argument contains password pattern: "password='super-secret-key'"
@@ -235,7 +235,7 @@ function Features() {
             Hardened security that keeps developers in control.
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground">
-            Don't trust third-party servers with host permissions. Linejump protects your agentic environment locally, using standard JSON-RPC stream interception.
+            Don't trust third-party servers with host permissions. LineJump protects your agentic environment locally, using standard JSON-RPC stream interception.
           </p>
         </motion.div>
 
@@ -329,7 +329,7 @@ function HowItWorks() {
     {
       num: "02",
       title: "Review pinned configurations",
-      body: "Linejump intercepts the initial schema check. Approve newly discovered tools or configuration revisions in the dashboard.",
+      body: "LineJump intercepts the initial schema check. Approve newly discovered tools or configuration revisions in the dashboard.",
     },
     {
       num: "03",
