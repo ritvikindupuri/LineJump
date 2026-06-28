@@ -15,47 +15,47 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      {/* Bold horizontal track line segments (theme-adaptive currentColor with subtle opacity) */}
-      <path
-        d="M 6 24 L 15 24"
+      {/* Three vertical anchor bars (representing the line structure) */}
+      {/* Left Anchor */}
+      <line
+        x1="12"
+        y1="30"
+        x2="12"
+        y2="20"
         stroke="currentColor"
-        strokeWidth="3.5"
+        strokeWidth="4"
         strokeLinecap="round"
-        opacity="0.25"
       />
-      <path
-        d="M 25 24 L 34 24"
+      {/* Right Anchor */}
+      <line
+        x1="28"
+        y1="30"
+        x2="28"
+        y2="20"
         stroke="currentColor"
-        strokeWidth="3.5"
+        strokeWidth="4"
         strokeLinecap="round"
-        opacity="0.25"
+      />
+      {/* Center Jump Anchor (Elevated, representing the Leap) */}
+      <line
+        x1="20"
+        y1="18"
+        x2="20"
+        y2="8"
+        stroke="currentColor"
+        strokeWidth="4"
+        strokeLinecap="round"
       />
 
-      {/* Elegant Bezier arc representing the jump path (monochrome currentColor) */}
+      {/* Dotted/dashed curve tracing the Leap path */}
       <path
-        d="M 13 24 C 13 10, 27 10, 27 24"
+        d="M 12 20 C 12 10, 20 2, 20 8 C 20 14, 28 10, 28 20"
         stroke="currentColor"
-        strokeWidth="4.2"
+        strokeWidth="2"
         strokeLinecap="round"
+        strokeDasharray="2 3"
         fill="none"
-      />
-
-      {/* Small motion trail under-arc (subtle opacity) */}
-      <path
-        d="M 16 24 C 16 16, 24 16, 24 24"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.2"
-      />
-
-      {/* Glowing packet node at the peak of the jump */}
-      <circle
-        cx="20"
-        cy="10"
-        r="3.5"
-        fill="currentColor"
+        opacity="0.7"
       />
     </svg>
   );
