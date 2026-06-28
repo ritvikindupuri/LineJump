@@ -1,3 +1,5 @@
+import type { Finding } from "./mcp-scanner";
+
 export interface CiCheckConfig {
   maxCritical?: number;
   maxHigh?: number;
@@ -5,80 +7,81 @@ export interface CiCheckConfig {
   minScore?: number;
 }
 
+export const DEFAULT_CI_CONFIG: CiCheckConfig = {
+  maxCritical: 0,
+  maxHigh: 0,
+  maxMedium: 100,
+  minScore: 50,
+};
+
 export interface CiCheckResult {
   passed: boolean;
   score: number;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  total: number;
-  failures: string[];
+  findings: {
+    critical: number;
+    high: number;
+    medium: number;
+  };
+  config: CiCheckConfig;
+  errors: string[];
 }
 
 export function evaluateCiCheck(
   score: number,
-  findings: Array<{ severity: string }>,
+  findings: Finding[],
   config: CiCheckConfig = {},
 ): CiCheckResult {
-  const critical = findings.filter((f) => f.severity === "critical").length;
-  const high = findings.filter((f) => f.severity === "high").length;
-  const medium = findings.filter((f) => f.severity === "medium").length;
-  const low = findings.filter((f) => f.severity === "low").length;
+  const mergedConfig = { ...DEFAULT_CI_CONFIG, ...config };
 
-  const failures: string[] = [];
+  const counts = {
+    critical: findings.filter((f) => f.severity === "critical").length,
+    high: findings.filter((f) => f.severity === "high").length,
+    medium: findings.filter((f) => f.severity === "medium").length,
+  };
 
-  if (config.maxCritical !== undefined && critical > config.maxCritical) {
-    failures.push(`Critical findings (${critical}) exceed threshold (${config.maxCritical})`);
+  const errors: string[] = [];
+
+  if (mergedConfig.minScore !== undefined && score < mergedConfig.minScore) {
+    errors.push(`Score ${score} is below the minimum required score of ${mergedConfig.minScore}`);
   }
-  if (config.maxHigh !== undefined && high > config.maxHigh) {
-    failures.push(`High-severity findings (${high}) exceed threshold (${config.maxHigh})`);
+  if (mergedConfig.maxCritical !== undefined && counts.critical > mergedConfig.maxCritical) {
+    errors.push(
+      `Found ${counts.critical} critical findings (max allowed: ${mergedConfig.maxCritical})`,
+    );
   }
-  if (config.maxMedium !== undefined && medium > config.maxMedium) {
-    failures.push(`Medium-severity findings (${medium}) exceed threshold (${config.maxMedium})`);
+  if (mergedConfig.maxHigh !== undefined && counts.high > mergedConfig.maxHigh) {
+    errors.push(`Found ${counts.high} high findings (max allowed: ${mergedConfig.maxHigh})`);
   }
-  if (config.minScore !== undefined && score < config.minScore) {
-    failures.push(`Safety score (${score}) below minimum threshold (${config.minScore})`);
+  if (mergedConfig.maxMedium !== undefined && counts.medium > mergedConfig.maxMedium) {
+    errors.push(`Found ${counts.medium} medium findings (max allowed: ${mergedConfig.maxMedium})`);
   }
 
   return {
-    passed: failures.length === 0,
+    passed: errors.length === 0,
     score,
-    critical,
-    high,
-    medium,
-    low,
-    total: findings.length,
-    failures,
+    findings: counts,
+    config: mergedConfig,
+    errors,
   };
 }
 
-export const DEFAULT_CI_CONFIG: CiCheckConfig = {
-  maxCritical: 0,
-  maxHigh: 1,
-  maxMedium: 3,
-  minScore: 60,
-};
-
 export function generateCiCheckMarkdown(result: CiCheckResult): string {
-  const status = result.passed ? "✅ PASSED" : "❌ FAILED";
-  const lines = [
-    `## Linejump CI Check — ${status}`,
-    ``,
-    `| Metric | Value |`,
-    `|--------|-------|`,
-    `| Safety Score | ${result.score}/100 |`,
-    `| Critical | ${result.critical} |`,
-    `| High | ${result.high} |`,
-    `| Medium | ${result.medium} |`,
-    `| Low | ${result.low} |`,
-    `| Total Findings | ${result.total} |`,
-  ];
-  if (!result.passed) {
-    lines.push(``, `### Failures`);
-    for (const f of result.failures) {
-      lines.push(`- ${f}`);
+  let md = `## Linejump Security Scan\n\n`;
+  if (result.passed) {
+    md += `✅ **PASSED**\n\n`;
+  } else {
+    md += `❌ **FAILED**\n\n### Errors:\n`;
+    for (const err of result.errors) {
+      md += `- ${err}\n`;
     }
+    md += `\n`;
   }
-  return lines.join("\n");
+
+  md += `### Summary\n`;
+  md += `- **Score:** ${result.score}/100\n`;
+  md += `- **Critical:** ${result.findings.critical}\n`;
+  md += `- **High:** ${result.findings.high}\n`;
+  md += `- **Medium:** ${result.findings.medium}\n`;
+
+  return md;
 }

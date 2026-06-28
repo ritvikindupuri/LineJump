@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+linejump.sqlite
+linejump.sqlite-journal
+database.sqlite
+linejump.sqlite
