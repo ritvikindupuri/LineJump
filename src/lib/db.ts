@@ -1,18 +1,17 @@
-import type { Database } from "bun:sqlite";
+import Database from "better-sqlite3";
 
-let db: Database | null = null;
+let db: Database.Database | null = null;
 
-async function getDb(): Promise<Database> {
+async function getDb(): Promise<Database.Database> {
   if (db) return db;
-  const { Database } = (await import("bun:sqlite")) as { Database: typeof import("bun:sqlite")["Database"] };
-  db = new Database("linejump.db", { create: true });
+  db = new Database("linejump.db");
   db.exec("PRAGMA journal_mode=WAL");
   db.exec("PRAGMA foreign_keys=ON");
   initSchema(db);
   return db;
 }
 
-function initSchema(db: Database): void {
+function initSchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS teams (
       id TEXT PRIMARY KEY,

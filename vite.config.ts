@@ -21,6 +21,14 @@ export default defineConfig({
     }),
     viteReact(),
   ],
+  build: {
+    rollupOptions: {
+      external: ["better-sqlite3"],
+    },
+  },
+  ssr: {
+    external: ["better-sqlite3"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
