@@ -53,18 +53,6 @@ function Header() {
         </Link>
         <div className="flex items-center gap-5">
           <Link
-            to="/history"
-            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            History
-          </Link>
-          <Link
-            to="/policy"
-            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Policy
-          </Link>
-          <Link
             to="/app"
             className="inline-flex items-center justify-center rounded-full bg-foreground px-4 py-1.5 text-xs font-semibold text-background transition-all hover:opacity-90"
           >
