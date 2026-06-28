@@ -69,7 +69,7 @@ function ScanInput({ onScan }: { onScan: (report: ScanReport, raw: string) => vo
       if (!url.trim()) { setError("Enter a manifest URL"); return; }
       setScanning(true);
       try {
-        const result = await fetchMcpManifest({ url: url.trim() });
+        const result = await fetchMcpManifest({ data: { url: url.trim() } });
         raw = result.raw;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Failed to fetch manifest";
