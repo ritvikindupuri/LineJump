@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
+import { LinejumpLogo } from "@/components/linejump-logo";
 import {
   ShieldCheck,
   Terminal,
@@ -42,9 +43,43 @@ const fadeUp = {
   transition: { duration: 0.7, ease },
 };
 
+function Header() {
+  return (
+    <header className="sticky top-0 z-30 border-b border-border/30 bg-background/60 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+        <Link to="/" className="flex items-center gap-2">
+          <LinejumpLogo size={22} className="text-foreground" />
+          <span className="text-[15px] font-medium tracking-tight">LineJump</span>
+        </Link>
+        <div className="flex items-center gap-5">
+          <Link
+            to="/history"
+            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            History
+          </Link>
+          <Link
+            to="/policy"
+            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Policy
+          </Link>
+          <Link
+            to="/app"
+            className="inline-flex items-center justify-center rounded-full bg-foreground px-4 py-1.5 text-xs font-semibold text-background transition-all hover:opacity-90"
+          >
+            Launch Dashboard
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function Index() {
   return (
-    <div className="min-h-screen bg-background text-foreground animate-fade-in pt-14">
+    <div className="min-h-screen bg-background text-foreground animate-fade-in">
+      <Header />
       <Hero />
       <ProxyVisualization />
       <Features />
