@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DiffRouteImport } from './routes/diff'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -23,6 +24,11 @@ const PolicyRoute = PolicyRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiffRoute = DiffRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/diff': typeof DiffRoute
+  '/docs': typeof DocsRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/diff': typeof DiffRoute
+  '/docs': typeof DocsRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
 }
@@ -60,21 +68,23 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/diff': typeof DiffRoute
+  '/docs': typeof DocsRoute
   '/history': typeof HistoryRoute
   '/policy': typeof PolicyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/diff' | '/history' | '/policy'
+  fullPaths: '/' | '/app' | '/diff' | '/docs' | '/history' | '/policy'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app' | '/diff' | '/history' | '/policy'
-  id: '__root__' | '/' | '/app' | '/diff' | '/history' | '/policy'
+  to: '/' | '/app' | '/diff' | '/docs' | '/history' | '/policy'
+  id: '__root__' | '/' | '/app' | '/diff' | '/docs' | '/history' | '/policy'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
   DiffRoute: typeof DiffRoute
+  DocsRoute: typeof DocsRoute
   HistoryRoute: typeof HistoryRoute
   PolicyRoute: typeof PolicyRoute
 }
@@ -93,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/diff': {
@@ -123,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
   DiffRoute: DiffRoute,
+  DocsRoute: DocsRoute,
   HistoryRoute: HistoryRoute,
   PolicyRoute: PolicyRoute,
 }

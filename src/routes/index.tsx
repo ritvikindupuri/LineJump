@@ -112,14 +112,12 @@ function Hero() {
               Launch Dashboard
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
             </Link>
-            <a
-              href="https://github.com/ritvikindupuri/LineJump"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/docs"
               className="rounded-full border border-border px-6 py-3 text-[14px] font-medium text-foreground hover:bg-secondary transition-colors"
             >
               Read Documentation
-            </a>
+            </Link>
           </motion.div>
         </motion.div>
       </div>
