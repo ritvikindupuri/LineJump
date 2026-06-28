@@ -359,10 +359,12 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     try {
       const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
       await approveManifestFn({
-        serverName: reportState.serverName,
-        manifestHash: clientHash,
-        manifestJson: rawManifest,
-        approvedBy: "security_admin"
+        data: {
+          serverName: reportState.serverName,
+          manifestHash: clientHash,
+          manifestJson: rawManifest,
+          approvedBy: "security_admin"
+        }
       });
       await loadApprovals();
       alert("Manifest version approved and signed off successfully.");
@@ -1140,17 +1142,17 @@ function SecurityGatekeeperView() {
   }, []);
 
   const handleApprove = async (id: string) => {
-    await approvePinnedToolFn({ id });
+    await approvePinnedToolFn({ data: { id } });
     await loadData();
   };
 
   const handleBlock = async (id: string) => {
-    await blockPinnedToolFn({ id });
+    await blockPinnedToolFn({ data: { id } });
     await loadData();
   };
 
   const handleRelease = async (id: string) => {
-    await releaseQuarantineFn({ id });
+    await releaseQuarantineFn({ data: { id } });
     await loadData();
   };
 
