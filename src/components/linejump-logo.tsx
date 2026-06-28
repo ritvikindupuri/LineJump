@@ -15,33 +15,15 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      {/* The continuous baseline that contours to form the bottom shield boundary */}
+      {/* Top half of the split circle (offset to the right, y-separated) */}
       <path
-        d="M 5 20 H 14 C 14 27, 20 32, 20 32 C 20 32, 26 27, 26 20 H 35"
-        stroke="currentColor"
-        strokeWidth="3.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
+        d="M 10 18 C 10 11.5, 15.5 6, 22 6 C 28.5 6, 34 11.5, 34 18 Z"
+        fill="currentColor"
       />
-
-      {/* The top cap that closes the shield boundary */}
+      {/* Bottom half of the split circle (offset to the left, y-separated) */}
       <path
-        d="M 14 20 C 14 13, 20 11, 20 11 C 20 11, 26 13, 26 20"
-        stroke="currentColor"
-        strokeWidth="3.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-
-      {/* A clean, solid security checkmark inside the shield */}
-      <path
-        d="M 17 20 L 19 22 L 23 18"
-        stroke="currentColor"
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M 6 22 C 6 28.5, 11.5 34, 18 34 C 24.5 34, 30 28.5, 30 22 Z"
+        fill="currentColor"
       />
     </svg>
   );
