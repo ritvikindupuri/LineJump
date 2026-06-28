@@ -600,13 +600,13 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             disabled={deepScanning}
           >
             <Brain className={`h-3 w-3 ${deepScanning ? "animate-pulse" : ""}`} />
-            {deepScanning ? "Analyzing..." : deepResult ? "Re-scan with LLM" : "Deep Scan with Claude"}
+            {deepScanning ? "Analyzing..." : deepResult ? "Re-scan with Gemini" : "Deep Scan with Gemini"}
           </Button>
         </div>
         <div className="p-5">
           {!deepResult ? (
             <p className="text-xs text-muted-foreground">
-              Run a deep semantic analysis using Claude. Catches social engineering, tone manipulation,
+              Run a deep semantic analysis using Gemini. Catches social engineering, tone manipulation,
               hidden persuasion, and capability deception that regex scanners miss.
             </p>
           ) : deepResult.llmScore < 0 ? (
