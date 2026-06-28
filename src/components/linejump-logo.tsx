@@ -15,33 +15,31 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
-      {/* Horizontal baseline segments with a gap (theme-adaptive currentColor with subtle opacity) */}
-      <line
-        x1="6"
-        y1="22"
-        x2="15"
-        y2="22"
+      {/* The continuous baseline that contours to form the bottom shield boundary */}
+      <path
+        d="M 5 20 H 14 C 14 27, 20 32, 20 32 C 20 32, 26 27, 26 20 H 35"
         stroke="currentColor"
-        strokeWidth="3.5"
+        strokeWidth="3.8"
         strokeLinecap="round"
-        opacity="0.3"
-      />
-      <line
-        x1="25"
-        y1="22"
-        x2="34"
-        y2="22"
-        stroke="currentColor"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        opacity="0.3"
+        strokeLinejoin="round"
+        fill="none"
       />
 
-      {/* Bold, minimalist lightning jump bolt bridging the gap */}
+      {/* The top cap that closes the shield boundary */}
       <path
-        d="M 23 8 L 14 22 L 26 22 L 17 32"
+        d="M 14 20 C 14 13, 20 11, 20 11 C 20 11, 26 13, 26 20"
         stroke="currentColor"
-        strokeWidth="4.5"
+        strokeWidth="3.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+
+      {/* A clean, solid security checkmark inside the shield */}
+      <path
+        d="M 17 20 L 19 22 L 23 18"
+        stroke="currentColor"
+        strokeWidth="2.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
