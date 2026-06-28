@@ -3,12 +3,45 @@ export type RiskSeverity = "critical" | "high" | "medium" | "low" | "info";
 
 export interface Finding {
   id: string;
+  ruleId?: string;
   severity: RiskSeverity;
   category: string;
   title: string;
   detail: string;
   toolName?: string;
   evidence?: string;
+  confidence?: "low" | "medium" | "high";
+}
+
+export interface ScannerPolicy {
+  disabledRules?: string[];
+  customRegexes?: Array<{ regex: string; severity: RiskSeverity; title: string; category: string }>;
+  severityOverrides?: Record<string, RiskSeverity>;
+  blockedCapabilities?: string[];
+  requireApproval?: boolean;
+}
+
+export function mergePolicy(policy?: ScannerPolicy): ScannerPolicy {
+  const defaults = {
+    disabledRules: [],
+    customRegexes: [],
+    severityOverrides: {
+      "capability.filesystem_read": "low",
+      "schema.param.path": "low",
+      "schema.param.url": "low",
+      "network.external_url": "info",
+    },
+    blockedCapabilities: [],
+    requireApproval: false,
+  };
+  return {
+    ...defaults,
+    ...policy,
+    severityOverrides: {
+      ...defaults.severityOverrides,
+      ...policy?.severityOverrides,
+    },
+  } as ScannerPolicy;
 }
 
 export interface McpTool {

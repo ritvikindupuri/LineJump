@@ -7,9 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
-import { AuthProvider } from "../lib/auth-context";
-import { Navbar } from "../components/navbar";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 
@@ -116,10 +114,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider initialUser={null} initialToken={null}>
-        <Navbar />
-        <Outlet />
-      </AuthProvider>
+      <Outlet />
     </QueryClientProvider>
   );
 }

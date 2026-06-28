@@ -20,6 +20,11 @@ function initSchema(db: Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS policies (
+      org_id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -201,12 +206,45 @@ export async function joinTeam(userId: string, teamId: string): Promise<void> {
   db.prepare("UPDATE users SET team_id = ? WHERE id = ?").run(teamId, userId);
 }
 
-export async function saveScan(userId: string, serverName: string, manifest: string, score: number, findings: any[], deepScore?: number, deepFindings?: any[], deepAnalysis?: string): Promise<string> {
+export async function saveScan(
+  arg1: string,
+  arg2: string,
+  arg3: any,
+  arg4: any,
+  arg5?: any,
+  deepScore?: number,
+  deepFindings?: any[],
+  deepAnalysis?: string
+): Promise<string> {
   const db = await getDb();
-  const id = crypto.randomUUID();
-  db.prepare("INSERT INTO scans (id, user_id, server_name, manifest, score, findings, deep_score, deep_findings, deep_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(id, userId, serverName, manifest, score, JSON.stringify(findings), deepScore ?? null, deepFindings ? JSON.stringify(deepFindings) : null, deepAnalysis ?? null);
-  return id;
+  
+  if (typeof arg4 === "object" || (arg5 && typeof arg5 === "object")) {
+    const id = arg1;
+    const orgId = arg2;
+    const serverUrl = arg3;
+    const manifest = arg4;
+    const report = arg5;
+
+    const serverName = serverUrl || report?.serverName || "unnamed";
+    const manifestStr = typeof manifest === "string" ? manifest : JSON.stringify(manifest);
+    const findingsStr = JSON.stringify(report?.findings || []);
+    const score = report?.score || 0;
+
+    db.prepare("INSERT OR REPLACE INTO scans (id, user_id, server_name, manifest, score, findings) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, "system", serverName, manifestStr, score, findingsStr);
+    return id;
+  } else {
+    const userId = arg1;
+    const serverName = arg2;
+    const manifest = arg3;
+    const score = arg4;
+    const findings = arg5;
+
+    const id = crypto.randomUUID();
+    db.prepare("INSERT INTO scans (id, user_id, server_name, manifest, score, findings, deep_score, deep_findings, deep_analysis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(id, userId, serverName, manifest, score, JSON.stringify(findings), deepScore ?? null, deepFindings ? JSON.stringify(deepFindings) : null, deepAnalysis ?? null);
+    return id;
+  }
 }
 
 export async function getScans(userId: string, limit = 50): Promise<any[]> {
@@ -357,4 +395,64 @@ export async function getLatestApprovedManifest(serverName: string): Promise<any
   const db = await getDb();
   return db.prepare("SELECT * FROM manifest_approvals WHERE server_name = ? ORDER BY approved_at DESC LIMIT 1").get(serverName) as any || null;
 }
+
+export async function getHistory(orgId: string = "default_org"): Promise<any[]> {
+  const db = await getDb();
+  const rows = db.prepare("SELECT id, server_name, score, findings, created_at FROM scans ORDER BY created_at DESC").all() as any[];
+  return rows.map((r) => {
+    const findingsList = JSON.parse(r.findings || "[]");
+    const mockReport = {
+      serverName: r.server_name,
+      score: r.score,
+      findings: findingsList,
+      toolCount: 0,
+      scannedAt: r.created_at,
+    };
+    return {
+      id: r.id,
+      server_url: r.server_name,
+      report_json: JSON.stringify(mockReport),
+      created_at: r.created_at,
+    };
+  });
+}
+
+export async function getScan(id: string): Promise<any | null> {
+  const db = await getDb();
+  const r = db.prepare("SELECT id, server_name, score, findings, created_at FROM scans WHERE id = ?").get(id) as any;
+  if (!r) return null;
+  const findingsList = JSON.parse(r.findings || "[]");
+  const mockReport = {
+    serverName: r.server_name,
+    score: r.score,
+    findings: findingsList,
+    toolCount: 0,
+    scannedAt: r.created_at,
+  };
+  return {
+    id: r.id,
+    server_url: r.server_name,
+    report_json: JSON.stringify(mockReport),
+    created_at: r.created_at,
+  };
+}
+
+export async function getPolicy(orgId: string): Promise<any> {
+  const db = await getDb();
+  const row = db.prepare("SELECT config_json FROM policies WHERE org_id = ?").get(orgId) as { config_json: string } | undefined;
+  if (!row) {
+    const { DEFAULT_SCANNER_POLICY } = await import("./default-policy");
+    const defaultJson = JSON.stringify(DEFAULT_SCANNER_POLICY);
+    db.prepare("INSERT INTO policies (org_id, config_json) VALUES (?, ?)").run(orgId, defaultJson);
+    return DEFAULT_SCANNER_POLICY;
+  }
+  return JSON.parse(row.config_json);
+}
+
+export async function updatePolicy(orgId: string, policy: unknown): Promise<void> {
+  const db = await getDb();
+  db.prepare("INSERT OR REPLACE INTO policies (org_id, config_json) VALUES (?, ?)")
+    .run(orgId, JSON.stringify(policy));
+}
+
 
