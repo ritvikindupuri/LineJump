@@ -16,34 +16,53 @@ export function LinejumpLogo({ size = 40, className, ...props }: LogoProps) {
       {...props}
     >
       <defs>
-        {/* Premium Charcoal-to-Stone gradient background */}
-        <linearGradient id="lj-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="oklch(0.35 0.03 55)" />
-          <stop offset="100%" stopColor="oklch(0.22 0.02 55)" />
+        {/* Vibrant copper-orange gradient for the jumping arc */}
+        <linearGradient id="lj-accent-grad" x1="12" y1="24" x2="28" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FF7E5F" />
+          <stop offset="100%" stopColor="#FEB47B" />
         </linearGradient>
       </defs>
-      {/* Background card */}
-      <rect x="2" y="2" width="36" height="36" rx="10" fill="url(#lj-grad)" />
-
-      {/* Single clean horizontal line */}
-      <line
-        x1="10"
-        y1="23"
-        x2="30"
-        y2="23"
-        stroke="oklch(0.955 0.018 80)"
-        strokeWidth="2"
+      {/* Bold horizontal track line segments (theme-adaptive currentColor) */}
+      <path
+        d="M 6 24 L 15 24"
+        stroke="currentColor"
+        strokeWidth="3.5"
         strokeLinecap="round"
-        opacity="0.3"
+        opacity="0.85"
+      />
+      <path
+        d="M 25 24 L 34 24"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        opacity="0.85"
       />
 
-      {/* Single bold jumping arc */}
+      {/* Elegant Bezier arc representing the jump path (Vibrant copper-orange gradient) */}
       <path
-        d="M 14 23 C 14 11, 26 11, 26 23"
-        stroke="oklch(0.78 0.08 55)"
-        strokeWidth="3.2"
+        d="M 13 24 C 13 10, 27 10, 27 24"
+        stroke="url(#lj-accent-grad)"
+        strokeWidth="4"
         strokeLinecap="round"
         fill="none"
+      />
+
+      {/* Small motion trail under-arc */}
+      <path
+        d="M 16 24 C 16 16, 24 16, 24 24"
+        stroke="url(#lj-accent-grad)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.4"
+      />
+
+      {/* Glowing packet node at the peak of the jump */}
+      <circle
+        cx="20"
+        cy="10"
+        r="3.5"
+        fill="#FFD200"
       />
     </svg>
   );
