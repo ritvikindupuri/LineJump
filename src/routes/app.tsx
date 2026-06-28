@@ -670,27 +670,59 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
       </Card>
 
       {/* Platform Workspace Tabs */}
-      <Tabs value={workspaceTab} onValueChange={setWorkspaceTab} className="space-y-4">
-        <div className="border-b border-border/30 pb-1">
-          <TabsList className="h-9 bg-muted/20 border border-border/20 p-1 flex">
-            <TabsTrigger value="findings" className="text-xs gap-1.5 flex-1">
-              <Layers className="h-3.5 w-3.5" />
-              Risk Findings ({reportState.findings.length})
-            </TabsTrigger>
-            <TabsTrigger value="path" className="text-xs gap-1.5 flex-1">
-              <GitFork className="h-3.5 w-3.5" />
-              Attack Path Graph
-            </TabsTrigger>
-            <TabsTrigger value="bom" className="text-xs gap-1.5 flex-1">
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              MCP-BOM Sheet
-            </TabsTrigger>
-            <TabsTrigger value="drift" className="text-xs gap-1.5 flex-1">
-              <Shield className="h-3.5 w-3.5" />
-              Drift Governance
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <TooltipProvider>
+        <Tabs value={workspaceTab} onValueChange={setWorkspaceTab} className="space-y-4">
+          <div className="border-b border-border/30 pb-1">
+            <TabsList className="h-9 bg-muted/20 border border-border/20 p-1 flex">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="findings" className="text-xs gap-1.5 flex-1">
+                    <Layers className="h-3.5 w-3.5" />
+                    Risk Findings ({reportState.findings.length})
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs font-normal">Deterministic security scan highlighting potential issues, suspicious keywords, and security policy violations.</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="path" className="text-xs gap-1.5 flex-1">
+                    <GitFork className="h-3.5 w-3.5" />
+                    Attack Path Graph
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs font-normal">Visual mapping of capabilities, showing chained paths from LLM client to exfiltration endpoints or execution risks.</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="bom" className="text-xs gap-1.5 flex-1">
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    MCP-BOM Sheet
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs font-normal">Software Bill of Materials for MCP server resources, mapping capabilities, safety scores, and external domains.</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="drift" className="text-xs gap-1.5 flex-1">
+                    <Shield className="h-3.5 w-3.5" />
+                    Drift Governance
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs font-normal">Change management tracker verifying manifest schema drift against signed and approved versions.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TabsList>
+          </div>
 
         {/* Tab Content: Risk Findings */}
         <TabsContent value="findings" className="space-y-3 focus-visible:outline-none">
@@ -860,6 +892,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
           />
         </TabsContent>
       </Tabs>
+    </TooltipProvider>
     </div>
   );
 }
@@ -1285,20 +1318,36 @@ function AppPage() {
               <h1 className="text-xl font-bold tracking-tight text-foreground">Console Control</h1>
               <p className="text-xs text-muted-foreground">Manage audits, live monitoring, and security exceptions.</p>
             </div>
-            <TabsList className="h-9 self-start sm:self-auto">
-              <TabsTrigger value="scanner" className="gap-1.5 text-xs">
-                <ScanLine className="h-3.5 w-3.5" />
-                Vulnerability Scanner
-              </TabsTrigger>
-              <TabsTrigger value="logs" className="gap-1.5 text-xs">
-                <Terminal className="h-3.5 w-3.5" />
-                Proxy Audit Log
-              </TabsTrigger>
-              <TabsTrigger value="gatekeeper" className="gap-1.5 text-xs">
-                <Shield className="h-3.5 w-3.5" />
-                Security Gatekeeper
-              </TabsTrigger>
-            </TabsList>
+            <TooltipProvider>
+              <TabsList className="h-9 self-start sm:self-auto">
+                <TabsTrigger value="scanner" className="gap-1.5 text-xs">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Vulnerability Scanner
+                </TabsTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="logs" className="gap-1.5 text-xs">
+                      <Terminal className="h-3.5 w-3.5" />
+                      Proxy Audit Log
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs font-normal">Real-time intercept log of JSON-RPC requests, showing duration, arguments, and security sanitization.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="gatekeeper" className="gap-1.5 text-xs">
+                      <Shield className="h-3.5 w-3.5" />
+                      Security Gatekeeper
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs font-normal">Manage Trust-on-First-Use (TOFU) tool pinning approvals and quarantined payloads.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TabsList>
+            </TooltipProvider>
           </div>
 
           <TabsContent value="scanner" className="focus-visible:outline-none">
