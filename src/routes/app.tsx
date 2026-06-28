@@ -392,7 +392,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const handleDeepScan = async () => {
     setDeepScanning(true);
     try {
-      const result = await deepScanManifest({ manifest: rawManifest, serverName: reportState.serverName });
+      const result = await deepScanManifest({ data: { manifest: rawManifest, serverName: reportState.serverName } });
       setDeepResult(result);
     } catch (e: unknown) {
       setDeepResult({

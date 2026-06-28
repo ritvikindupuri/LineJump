@@ -68,17 +68,114 @@ export const deepScanManifest = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<DeepScanResult> => {
     checkRateLimit("deep-scan", 20, 60000);
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+    if (!anthropicKey && !geminiKey) {
       return {
         findings: [],
         llmScore: -1,
-        analysis: "Deep scan unavailable: ANTHROPIC_API_KEY not configured. Set it in your .env file.",
+        analysis: "Deep scan unavailable: Neither ANTHROPIC_API_KEY nor GEMINI_API_KEY / GOOGLE_API_KEY is configured. Set one in your environment variables or .env file.",
         model: "none",
         tokenUsage: { input: 0, output: 0 },
       };
     }
 
+    if (geminiKey && !anthropicKey) {
+      const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Analyze this MCP server manifest for semantic security threats:\n\nServer: ${data.serverName}\n\nManifest JSON:\n\`\`\`json\n${data.manifest}\n\`\`\``,
+                    },
+                  ],
+                },
+              ],
+              systemInstruction: {
+                parts: [
+                  {
+                    text: SYSTEM_PROMPT,
+                  },
+                ],
+              },
+              generationConfig: {
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "Unknown error");
+          return {
+            findings: [{
+              severity: "info",
+              category: "LLM Error",
+              title: "Gemini API error",
+              detail: `API returned status ${response.status}: ${errText.substring(0, 500)}`,
+              toolName: undefined,
+              evidence: undefined,
+              llmReasoning: "Gemini API call failed",
+            }],
+            llmScore: -1,
+            analysis: "Gemini analysis could not complete. Check your GEMINI_API_KEY.",
+            model,
+            tokenUsage: { input: 0, output: 0 },
+          };
+        }
+
+        const resData = await response.json();
+        const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("Empty response from Gemini");
+
+        const parsed = JSON.parse(text);
+        return {
+          findings: (parsed.findings || []).map((f: any) => ({
+            severity: validateSeverity(f.severity),
+            category: f.category || "Semantic",
+            title: f.title || "Potential Risk",
+            detail: f.detail || "",
+            toolName: f.toolName,
+            evidence: f.evidence,
+            llmReasoning: f.llmReasoning || "",
+          })),
+          llmScore: Math.max(0, Math.min(100, typeof parsed.llmScore === "number" ? parsed.llmScore : 100)),
+          analysis: parsed.analysis || "Analysis complete.",
+          model,
+          tokenUsage: {
+            input: resData.usageMetadata?.promptTokenCount || 0,
+            output: resData.usageMetadata?.candidatesTokenCount || 0,
+          },
+        };
+      } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : "Unknown error";
+        return {
+          findings: [{
+            severity: "info",
+            category: "LLM Error",
+            title: "Gemini scan failed",
+            detail: errMsg,
+            llmReasoning: "Exception occurred during Gemini execution or JSON parsing."
+          }],
+          llmScore: -1,
+          analysis: "Gemini analysis failed to parse.",
+          model,
+          tokenUsage: { input: 0, output: 0 },
+        };
+      }
+    }
+
+    // Anthropic Flow (if ANTHROPIC_API_KEY is configured)
     const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 
     try {
@@ -86,7 +183,7 @@ export const deepScanManifest = createServerFn({ method: "POST" })
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
+          "x-api-key": anthropicKey!,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
