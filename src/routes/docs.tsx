@@ -18,7 +18,8 @@ import {
   Settings,
   Flame,
   CheckCircle,
-  Database
+  Database,
+  Brain
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -281,7 +282,7 @@ function DocsPage() {
                   <p>
                     LineJump secures your agent environment by acting as a transparent stdio command-line proxy wrapping downstream servers, alongside a comprehensive web governance panel that handles:
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2 mt-4">
+                  <div className="grid gap-3 sm:grid-cols-3 mt-4">
                     <Card className="p-4 bg-card/40 border-border/60">
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                         <Lock className="h-3.5 w-3.5 text-accent" />
@@ -298,6 +299,15 @@ function DocsPage() {
                       </h4>
                       <p className="text-[11px] text-muted-foreground mt-1 leading-normal">
                         Blocks Server-Side Request Forgery by tracing redirect hops and verifying DNS resolves away from internal subnets.
+                      </p>
+                    </Card>
+                    <Card className="p-4 bg-card/40 border-border/60">
+                      <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Brain className="h-3.5 w-3.5 text-accent" />
+                        Gemini Deep Scan
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-normal">
+                        Leverages Gemini 2.5 Pro to trace subtle prompt injections, capability mismatches, and social engineering in tool descriptions.
                       </p>
                     </Card>
                   </div>
