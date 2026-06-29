@@ -12,7 +12,9 @@ import {
   Lock,
   Activity,
   Check,
-  Layers
+  Layers,
+  Monitor,
+  Server
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -257,8 +259,8 @@ function WorksDiagram() {
         
         {/* Node 1: Client */}
         <div className="flex-1 flex flex-col items-center p-5 rounded-xl border border-border/40 bg-background/50 w-full max-w-[200px]">
-          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-secondary text-foreground mb-3 font-semibold text-xs">
-            Client
+          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-secondary text-foreground mb-3">
+            <Monitor className="h-4 w-4 text-muted-foreground" />
           </div>
           <span className="text-sm font-semibold">LLM Chat Host</span>
           <span className="text-[11px] text-muted-foreground mt-1">Claude Desktop / Cursor</span>
@@ -293,8 +295,8 @@ function WorksDiagram() {
 
         {/* Node 3: Downstream Server */}
         <div className="flex-1 flex flex-col items-center p-5 rounded-xl border border-border/40 bg-background/50 w-full max-w-[200px]">
-          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-secondary text-foreground mb-3 font-semibold text-xs">
-            Server
+          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-secondary text-foreground mb-3">
+            <Server className="h-4 w-4 text-muted-foreground" />
           </div>
           <span className="text-sm font-semibold">MCP Server</span>
           <span className="text-[11px] text-muted-foreground mt-1">Filesystem, Shell, SQL</span>
