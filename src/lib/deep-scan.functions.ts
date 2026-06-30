@@ -96,11 +96,20 @@ export const deepScanManifest = createServerFn({ method: "POST" })
       if (!text) throw new Error("Empty response from Ollama model");
 
       const parsed = JSON.parse(text);
-      const hasFindings = parsed.findings && parsed.findings.length > 0;
+      const findingsList = parsed.findings || [];
+      const hasFindings = findingsList.length > 0;
 
-      const defaultAnalysis = hasFindings
-        ? `### Local AI Security Review\n\n* **Findings Detected**: Flagged ${parsed.findings.length} potential security concerns.\n* **Action Required**: Please review the detailed findings listed below before authorizing sign-off.`
-        : `### Local AI Security Review\n\n* **Scan Attestation**: Clean audit. No prompt injection vectors, capability mismatches, or malicious obfuscation patterns were detected.\n* **Permissions Check**: Tools are correctly scoped for their declared descriptions.\n* **Recommendation**: Safe for deployment.`;
+      let analysisText = parsed.analysis;
+      if (!analysisText) {
+        if (hasFindings) {
+          analysisText = `### Local AI Security Review\n\n* **Verdict**: **UNSAFE (REVISE RECOMMENDED)**\n* **Summary**: Flagged ${findingsList.length} potential security concern(s) in this manifest.\n\n`;
+          findingsList.forEach((f: any, i: number) => {
+            analysisText += `* **Concern ${i + 1}**: **${f.title || "Potential Risk"}**\n  ${f.detail || ""}\n\n`;
+          });
+        } else {
+          analysisText = `### Local AI Security Review\n\n* **Scan Attestation**: Clean audit. No prompt injection vectors, capability mismatches, or malicious obfuscation patterns were detected.\n* **Permissions Check**: Tools are correctly scoped for their declared descriptions.\n* **Recommendation**: Safe for deployment.`;
+        }
+      }
 
       let scoreVal = 100;
       if (typeof parsed.llmScore === "number") {
@@ -108,7 +117,7 @@ export const deepScanManifest = createServerFn({ method: "POST" })
       }
 
       return {
-        findings: (parsed.findings || []).map((f: any) => ({
+        findings: findingsList.map((f: any) => ({
           severity: validateSeverity(f.severity),
           category: f.category || "Semantic",
           title: f.title || "Potential Risk",
@@ -118,7 +127,7 @@ export const deepScanManifest = createServerFn({ method: "POST" })
           llmReasoning: f.llmReasoning || "",
         })),
         llmScore: Math.max(0, Math.min(100, scoreVal)),
-        analysis: parsed.analysis || defaultAnalysis,
+        analysis: analysisText,
         model,
         tokenUsage: { input: 0, output: 0 },
       };
@@ -216,16 +225,37 @@ export const runAutonomousSecurityAgentFn = createServerFn({ method: "POST" })
       const parsed = JSON.parse(text);
       const isUnsafe = parsed.safetyDecision === "unsafe";
 
-      const defaultExplanation = isUnsafe
-        ? `### Local AI Security Audit\n\n* **Verdict**: **UNSAFE (BLOCK RECOMMENDED)**\n* **Reason**: Found potential security vulnerabilities or dangerous drift configurations.\n* **Action**: Do not sign. Review tool capability changes in detail before authorizing.`
-        : `### Local AI Security Audit\n\n* **Verdict**: **SAFE (APPROVAL RECOMMENDED)**\n* **Reason**: Checked manifest changes. No dangerous capability escalation or injection hazards were found.\n* **Action**: Safe to approve and generate signature sign-off.`;
+      let explanationText = parsed.explanation;
+      if (!explanationText) {
+        if (isUnsafe) {
+          explanationText = `### Local AI Security Audit\n\n* **Verdict**: **UNSAFE (BLOCK RECOMMENDED)**\n* **Reason**: Detected unapproved schema drift or dangerous tool changes in the manifest.\n\n`;
+
+          let diffs: any[] = [];
+          try {
+            diffs = JSON.parse(data.diffsJson || "[]");
+          } catch {}
+
+          if (diffs.length > 0) {
+            explanationText += `#### Drift Anomalies Detected:\n`;
+            diffs.forEach((d: any) => {
+              const typeLabel = d.type === "add" ? "Added" : d.type === "remove" ? "Removed" : "Modified";
+              explanationText += `* **[${typeLabel}]** Tool \`${d.name}\`: ${d.detail}\n`;
+            });
+            explanationText += `\n* **Action**: Do not sign. Revert these manifest modifications before deploying.`;
+          } else {
+            explanationText += `* **Action**: Do not sign. Review tool capability changes in detail before authorizing.`;
+          }
+        } else {
+          explanationText = `### Local AI Security Audit\n\n* **Verdict**: **SAFE (APPROVAL RECOMMENDED)**\n* **Reason**: Checked manifest changes. No dangerous capability escalation or injection hazards were found.\n* **Action**: Safe to approve and generate signature sign-off.`;
+        }
+      }
 
       return {
         thinking: parsed.thinking || "Local AI change audit evaluation complete.",
         safetyDecision: isUnsafe ? "unsafe" : "safe",
         proposedSignerName: parsed.proposedSignerName || `LineJump Local Agent (${model})`,
         proposedKeyScheme: parsed.proposedKeyScheme || "Local Security Signature",
-        explanation: parsed.explanation || defaultExplanation
+        explanation: explanationText
       };
     } catch (e: any) {
       const errMsg = e.message || e;
