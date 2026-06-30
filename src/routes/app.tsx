@@ -371,6 +371,9 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const [approvalsHistory, setApprovalsHistory] = useState<any[]>([]);
   const [signing, setSigning] = useState(false);
 
+  const currentHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
+  const isMatch = lastApproved && lastApproved.status === "approved" && lastApproved.manifest_hash === currentHash;
+
   const [signatureModal, setSignatureModal] = useState<{
     step: 1 | 2 | 3;
     checked: boolean;
@@ -905,7 +908,12 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs font-normal">Deterministic security scan highlighting potential issues, suspicious keywords, and security policy violations.</p>
+                  <p className="text-xs font-normal">
+                    {reportState.findings.length === 0
+                      ? "Deterministic security scan. Clean: 0 policy or safety alerts detected in the schema."
+                      : `Deterministic security scan. Warning: ${reportState.findings.length} safety alert(s) detected. Check the list below.`
+                    }
+                  </p>
                 </TooltipContent>
               </Tooltip>
 
@@ -917,7 +925,12 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs font-normal">Visual mapping of capabilities, showing chained paths from LLM client to exfiltration endpoints or execution risks.</p>
+                  <p className="text-xs font-normal">
+                    {reportState.attackPath?.edges.some(e => e.severity === 'critical' || e.severity === 'high')
+                      ? "Visual capability graph. Warning: High risk path detected linking tools to execution or network exfiltration."
+                      : "Visual capability graph. Checked: Path mapping shows no critical threat chains or exfiltration routes."
+                    }
+                  </p>
                 </TooltipContent>
               </Tooltip>
 
@@ -929,7 +942,9 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs font-normal">Software Bill of Materials for MCP server resources, mapping capabilities, safety scores, and external domains.</p>
+                  <p className="text-xs font-normal">
+                    {`Software Bill of Materials. Maps ${reportState.bom?.length || 0} exposed tool(s) and capability definitions in this manifest.`}
+                  </p>
                 </TooltipContent>
               </Tooltip>
 
@@ -941,7 +956,16 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs font-normal">Change management tracker verifying manifest schema drift against signed and approved versions.</p>
+                  <p className="text-xs font-normal">
+                    {!lastApproved
+                      ? "Change management tracker. No signed base version has been approved yet. Run approval sign-off to set base."
+                      : lastApproved.status === 'denied'
+                      ? "Change management tracker. Warning: The last version was rejected. Do not run or deploy until changes are approved."
+                      : isMatch
+                      ? "Change management tracker. Secure: Current manifest schema perfectly matches the approved version signature."
+                      : "Change management tracker. Warning: Schema drift detected! Current manifest differs from the signed approval version."
+                    }
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TabsList>
