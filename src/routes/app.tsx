@@ -761,13 +761,13 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             disabled={deepScanning}
           >
             <Brain className={`h-3 w-3 ${deepScanning ? "animate-pulse" : ""}`} />
-            {deepScanning ? "Analyzing..." : deepResult ? "Re-scan with Gemini" : "Deep Scan with Gemini"}
+            {deepScanning ? "Analyzing..." : deepResult ? "Re-scan with Local AI" : "Deep Scan with Local AI"}
           </Button>
         </div>
         <div className="p-5">
           {!deepResult ? (
             <p className="text-xs text-muted-foreground">
-              Run a deep semantic analysis using Gemini. Catches social engineering, tone manipulation,
+              Run a deep semantic analysis using local safety models. Catches social engineering, tone manipulation,
               hidden persuasion, and capability deception that regex scanners miss.
             </p>
           ) : deepResult.llmScore < 0 ? (
@@ -1069,7 +1069,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   <ShieldCheck className="h-5 w-5 text-green-500" />
                   Autonomous AI Security Audit Console
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Gemini-powered manifest sign-off check</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Local AI-powered manifest sign-off check</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSignatureModal(null)} disabled={signing}>Cancel</Button>
             </div>

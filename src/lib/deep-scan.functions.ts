@@ -68,73 +68,29 @@ export const deepScanManifest = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<DeepScanResult> => {
     checkRateLimit("deep-scan", 20, 60000);
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const model = "llama-guard3";
 
-    if (!apiKey) {
-      return {
-        findings: [],
-        llmScore: -1,
-        analysis: "Deep scan unavailable: GEMINI_API_KEY / GOOGLE_API_KEY is not configured. Set it in your environment variables or .env file.",
-        model: "none",
-        tokenUsage: { input: 0, output: 0 },
-      };
-    }
-
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Analyze this MCP server manifest for semantic security threats:\n\nServer: ${data.serverName}\n\nManifest JSON:\n\`\`\`json\n${data.manifest}\n\`\`\``,
-                  },
-                ],
-              },
-            ],
-            systemInstruction: {
-              parts: [
-                {
-                  text: SYSTEM_PROMPT,
-                },
-              ],
-            },
-            generationConfig: {
-              responseMimeType: "application/json",
-            },
-          }),
-        }
-      );
+      const ollamaRes = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama-guard3",
+          prompt: `System Prompt:\n${SYSTEM_PROMPT}\n\nTask Request:\nAnalyze this MCP server manifest for semantic security threats:\n\nServer: ${data.serverName}\n\nManifest JSON:\n\`\`\`json\n${data.manifest}\n\`\`\``,
+          stream: false,
+          format: "json"
+        })
+      });
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "Unknown error");
-        return {
-          findings: [{
-            severity: "info",
-            category: "LLM Error",
-            title: "Gemini API error",
-            detail: `API returned status ${response.status}: ${errText.substring(0, 500)}`,
-            toolName: undefined,
-            evidence: undefined,
-            llmReasoning: "Gemini API call failed",
-          }],
-          llmScore: -1,
-          analysis: "Gemini analysis could not complete. Check your GEMINI_API_KEY.",
-          model,
-          tokenUsage: { input: 0, output: 0 },
-        };
+      if (!ollamaRes.ok) {
+        throw new Error(`Ollama returned status ${ollamaRes.status}`);
       }
 
-      const resData = await response.json();
-      const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Empty response from Gemini");
+      const resJson = await ollamaRes.json() as any;
+      const text = resJson.response;
+      if (!text) throw new Error("Empty response from Ollama model");
 
       const parsed = JSON.parse(text);
       return {
@@ -150,25 +106,22 @@ export const deepScanManifest = createServerFn({ method: "POST" })
         llmScore: Math.max(0, Math.min(100, typeof parsed.llmScore === "number" ? parsed.llmScore : 100)),
         analysis: parsed.analysis || "Analysis complete.",
         model,
-        tokenUsage: {
-          input: resData.usageMetadata?.promptTokenCount || 0,
-          output: resData.usageMetadata?.candidatesTokenCount || 0,
-        },
+        tokenUsage: { input: 0, output: 0 },
       };
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : "Unknown error";
+    } catch (e: any) {
+      const errMsg = e.message || e;
       return {
         findings: [{
           severity: "info",
-          category: "LLM Error",
-          title: "Gemini scan failed",
+          category: "Local AI Error",
+          title: "Local security scan failed",
           detail: errMsg,
-          llmReasoning: "Exception occurred during Gemini execution or JSON parsing."
+          llmReasoning: `Failed to connect to local Ollama server running Llama Guard 3. Make sure Ollama is started.`
         }],
         llmScore: -1,
-        analysis: "Gemini analysis failed to parse.",
+        analysis: `Local AI analysis failed. Please verify Ollama is running 'llama-guard3' locally. Error: ${errMsg}`,
         model,
-        tokenUsage: { input: 0, output: 0 },
+        tokenUsage: { input: 0, output: 0 }
       };
     }
   });
@@ -222,7 +175,7 @@ export const runAutonomousSecurityAgentFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<AutonomousAgentResult> => {
     checkRateLimit("agent", 20, 60000);
-    const model = data.modelName === "gemini-2.5-flash" || !data.modelName ? "llama-guard3" : data.modelName;
+    const model = !data.modelName ? "llama-guard3" : data.modelName;
 
     try {
       const ollamaRes = await fetch("http://localhost:11434/api/generate", {
