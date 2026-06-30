@@ -834,7 +834,12 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                           Local AI Safety Score
                         </p>
                         <p className="text-muted-foreground text-[11px] leading-relaxed">
-                          Evaluates the manifest for social engineering, hidden prompt injection instructions, and capability escalations. A score of 100 indicates no safety violations were detected by Llama Guard 3.
+                          {deepResult.llmScore === 100
+                            ? "A perfect safety score of 100 indicates no social engineering, prompt injection instructions, or capability escalations were detected by Llama Guard 3."
+                            : deepResult.llmScore >= 70
+                            ? `A safety score of ${deepResult.llmScore}/100 indicates low-to-medium risk findings or minor capability anomalies were identified. Review the warnings below before signing.`
+                            : `A critical safety score of ${deepResult.llmScore}/100 indicates high-risk threat vectors or policy violations were detected by Llama Guard 3. High threat of prompt hijacking or data exfiltration.`
+                          }
                         </p>
                       </TooltipContent>
                     </Tooltip>
