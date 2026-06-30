@@ -1028,12 +1028,6 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             </div>
 
             <div className="space-y-4">
-              {apiError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-xs font-semibold">
-                  {apiError}
-                </div>
-              )}
-
               {/* Agent Log Console */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Agent Thinking Process:</span>
@@ -1183,12 +1177,6 @@ function DiffGovernancePanel({
 
   return (
     <div className="space-y-4">
-      {apiError && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-xs font-semibold animate-pulse">
-          {apiError}
-        </div>
-      )}
-
       <Card className="border-border/50 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">

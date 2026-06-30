@@ -49,25 +49,32 @@ export const releaseQuarantineFn = createServerFn({ method: "POST" })
   });
 
 export const getManifestApprovalsFn = createServerFn({ method: "POST" })
-  .validator((d: { serverName?: string } | undefined) => d || {})
+  .validator((d: any) => {
+    const payload = d && d.data ? d.data : d;
+    return payload || {};
+  })
   .handler(async ({ data }) => {
     return await db.getManifestApprovals(data.serverName);
   });
 
 export const approveManifestFn = createServerFn({ method: "POST" })
-  .validator((d: { serverName: string; manifestHash: string; manifestJson: string; approvedBy?: string }) => {
-    if (!d.serverName || !d.manifestHash || !d.manifestJson) throw new Error("Invalid parameters");
-    return d;
+  .validator((d: any) => {
+    const payload = d && d.data ? d.data : d;
+    if (!payload || !payload.serverName || !payload.manifestHash || !payload.manifestJson) {
+      throw new Error("Invalid parameters");
+    }
+    return payload;
   })
   .handler(async ({ data }) => {
-    await db.approveManifest(data.serverName, data.manifestHash, data.manifestJson, data.approvedBy);
+    await db.approveManifest(data.serverName, data.manifestHash, data.manifestJson, data.approvedBy, data.keyScheme);
     return { success: true };
   });
 
 export const getLatestApprovedManifestFn = createServerFn({ method: "POST" })
-  .validator((d: { serverName: string }) => {
-    if (!d.serverName) throw new Error("serverName is required");
-    return d;
+  .validator((d: any) => {
+    const payload = d && d.data ? d.data : d;
+    if (!payload || !payload.serverName) throw new Error("serverName is required");
+    return payload;
   })
   .handler(async ({ data }) => {
     return await db.getLatestApprovedManifest(data.serverName);
