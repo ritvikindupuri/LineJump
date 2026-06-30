@@ -821,9 +821,24 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">LLM Score</span>
-                  <span className={`text-lg font-bold ${deepResult.llmScore >= 75 ? "text-green-500" : deepResult.llmScore >= 50 ? "text-yellow-500" : "text-red-500"}`}>
-                    {deepResult.llmScore}/100
-                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={`text-lg font-bold cursor-help border-b border-dashed border-muted-foreground/35 pb-0.5 ${deepResult.llmScore >= 75 ? "text-green-500" : deepResult.llmScore >= 50 ? "text-yellow-500" : "text-red-500"}`}>
+                          {deepResult.llmScore}/100
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] p-3 text-xs leading-normal bg-card border-border/80 text-foreground shadow-xl">
+                        <p className="font-semibold mb-1 flex items-center gap-1.5 text-foreground">
+                          <Brain className="h-3.5 w-3.5 text-[#6C5CE7]" />
+                          Local AI Safety Score
+                        </p>
+                        <p className="text-muted-foreground text-[11px] leading-relaxed">
+                          Evaluates the manifest for social engineering, hidden prompt injection instructions, and capability escalations. A score of 100 indicates no safety violations were detected by Llama Guard 3.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   <span>Tokens: {deepResult.tokenUsage.input} in / {deepResult.tokenUsage.output} out</span>
