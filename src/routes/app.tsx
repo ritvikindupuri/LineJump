@@ -676,7 +676,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
               </div>
               {!ciResult.passed && (
                 <ul className="space-y-1">
-                  {ciResult.failures.map((f, i) => (
+                  {ciResult.errors.map((f, i) => (
                     <li key={i} className="text-xs text-destructive">{f}</li>
                   ))}
                 </ul>
