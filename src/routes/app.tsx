@@ -386,58 +386,14 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
 
   const executeSignatureFlow = async () => {
     if (!signatureModal) return;
-    setSignatureModal(prev => ({
-      ...prev!,
-      step: 3,
-      signingInProgress: true,
-      log: ["[LineJump HSM] Initiating cryptographic authorization session..."]
-    }));
-
-    const addLogWithDelay = (message: string, delay: number) => {
-      return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          setSignatureModal(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              log: [...prev.log, message]
-            };
-          });
-          resolve();
-        }, delay);
-      });
-    };
-
+    setSigning(true);
     try {
-      await addLogWithDelay("[LineJump HSM] Compiling tool schema list...", 250);
-      const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
-      await addLogWithDelay(`[LineJump HSM] Calculated manifest hash: ${clientHash}`, 250);
-      await addLogWithDelay(`[LineJump HSM] Packaging reviewer credentials: ${signatureModal.reviewer}`, 250);
-      await addLogWithDelay(`[LineJump HSM] Signing hash with token: ${signatureModal.keyType}...`, 350);
-      
-      // Call the server function!
       await handleSignManifest(signatureModal.reviewer);
-      
-      await addLogWithDelay("[LineJump HSM] Signature registered and written to SQLite DB.", 250);
-      await addLogWithDelay("[LineJump HSM] Verification SUCCESS: Manifest authorized for deployment!", 200);
-      
-      setSignatureModal(prev => {
-        if (!prev) return prev;
-        return { ...prev, signingInProgress: false };
-      });
-      
-      setTimeout(() => {
-        setSignatureModal(null);
-      }, 1500);
+      setSignatureModal(null);
     } catch (err: any) {
-      setSignatureModal(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          signingInProgress: false,
-          log: [...prev.log, `[LineJump HSM] ERROR: Signing failed: ${err.message || err}`]
-        };
-      });
+      alert(`Signature failed: ${err.message || err}`);
+    } finally {
+      setSigning(false);
     }
   };
 
@@ -1035,37 +991,17 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-2">
-                  <Button variant="ghost" size="sm" onClick={() => setSignatureModal({ ...signatureModal, step: 1 })} className="h-8 text-xs">
+                  <Button variant="ghost" size="sm" disabled={signing} onClick={() => setSignatureModal({ ...signatureModal, step: 1 })} className="h-8 text-xs">
                     Back
                   </Button>
                   <Button
                     size="sm"
-                    disabled={!signatureModal.reviewer.trim()}
+                    disabled={!signatureModal.reviewer.trim() || signing}
                     onClick={executeSignatureFlow}
                     className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white font-medium"
                   >
-                    Generate Signature & Sign
+                    {signing ? "Signing..." : "Generate Signature & Sign"}
                   </Button>
-                </div>
-              </div>
-            )}
-
-            {signatureModal.step === 3 && (
-              <div className="space-y-4">
-                <div className="rounded bg-black p-3 font-mono text-[10px] text-green-400 min-h-[140px] space-y-1 overflow-y-auto max-h-[200px]">
-                  {signatureModal.log.map((line, idx) => (
-                    <div key={idx} className="leading-relaxed whitespace-pre-wrap">{line}</div>
-                  ))}
-                  {signatureModal.signingInProgress && (
-                    <div className="animate-pulse">_</div>
-                  )}
-                </div>
-                <div className="flex justify-end">
-                  {!signatureModal.signingInProgress && (
-                    <Button size="sm" variant="outline" className="h-8 text-xs border-border" onClick={() => setSignatureModal(null)}>
-                      Close Portal
-                    </Button>
-                  )}
                 </div>
               </div>
             )}
