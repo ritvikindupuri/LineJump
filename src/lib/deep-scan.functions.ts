@@ -329,7 +329,7 @@ export const runAuditStepFn = createServerFn({ method: "POST" })
         args.push(lastApprovedPath, manifestPath);
       }
       
-      const { stdout, stderr } = await execFilePromise("node", ["cli.js", data.command, ...args], { cwd: process.cwd() });
+      const { stdout, stderr } = await execFilePromise("node", ["cli.cjs", data.command, ...args], { cwd: process.cwd() });
       return { stdout: stdout || stderr };
     } catch (e: any) {
       return { stdout: e.stdout || e.stderr || e.message };
