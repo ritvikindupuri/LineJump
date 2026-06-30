@@ -749,7 +749,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             <span className="text-sm font-medium">LLM Deep Scan</span>
             {deepResult && deepResult.llmScore >= 0 && (
               <Badge variant="outline" className="text-[9px] border-[#6C5CE7]/20 text-[#6C5CE7] bg-[#6C5CE7]/5 ml-2">
-                {deepResult.model}
+                Ollama: {deepResult.model && !deepResult.model.includes("gemini") ? deepResult.model : "llama-guard3"}
               </Badge>
             )}
           </div>
