@@ -338,10 +338,10 @@ function DocsPage() {
                     <Card className="p-4 bg-card/40 border-border/60">
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                         <Brain className="h-3.5 w-3.5 text-accent" />
-                        Gemini Deep Scan
+                        Local AI Deep Scan
                       </h4>
                       <p className="text-[11px] text-muted-foreground mt-1 leading-normal">
-                        Leverages Gemini 2.5 Pro to trace subtle prompt injections, capability mismatches, and social engineering in tool descriptions.
+                        Leverages the local Llama Guard 3 model to trace subtle prompt injections, capability mismatches, and social engineering in tool descriptions.
                       </p>
                     </Card>
                   </div>
@@ -399,7 +399,7 @@ function DocsPage() {
                   <ol className="list-decimal pl-5 space-y-2 text-xs">
                     <li><strong>Initial Scan</strong>: Unregistered manifests default to a yellow <em>No Approved Version Found</em> status. LineJump registers the server metadata and computes a unique polynomial manifest hash.</li>
                     <li><strong>Drift Detection</strong>: If a server's active tools, descriptions, or parameters differ from the last authorized database entry, LineJump flags the server with a <em>Drift Detected Pending Approval</em> warning.</li>
-                    <li><strong>AI-Powered Auditing</strong>: When initiating change authorization, LineJump spawns an <strong>Autonomous AI Security Agent</strong> (powered by Gemini) to compare the changes side-by-side, analyze the diff for injection threats or capability escalation, and stream its thinking process log-by-log.</li>
+                    <li><strong>AI-Powered Auditing</strong>: When initiating change authorization, LineJump spawns an <strong>Autonomous AI Security Agent</strong> (powered by Llama Guard 3 running locally via Ollama) to compare the changes side-by-side, analyze the diff for injection threats or capability escalation, and stream its thinking process log-by-log.</li>
                     <li><strong>Audit verdicts & Sign-off</strong>:
                       <ul className="list-disc pl-5 mt-1 space-y-1">
                         <li><strong>Approve</strong>: Confirms the configuration, applies a digital signature using the agent's proposed key scheme, and writes an <code>approved</code> status. The dashboard updates to a green <strong>Authorized Matches Approval</strong> status, indicating no active drift.</li>
@@ -408,6 +408,16 @@ function DocsPage() {
                     </li>
                     <li><strong>Signed Approvals Trail</strong>: All approval and denial actions are persisted sequentially in the SQLite database, displaying a color-coded history log (green <code>Signed</code> and red <code>Denied</code> badges) showing timestamps, reviewers, and signing key schemes.</li>
                   </ol>
+
+                  <h4 className="text-sm font-semibold text-foreground mt-4">Why Llama Guard 3 was Chosen</h4>
+                  <p className="text-xs">
+                    To eliminate the security risks of sending proprietary manifests and system architecture details to third-party public cloud endpoints, LineJump runs its AI audits completely locally via <strong>Ollama</strong>. We selected <strong>Llama Guard 3</strong> as the core safety auditor because:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1.5 text-xs">
+                    <li><strong>Data Privacy & Air-gapped Auditing</strong>: Tool manifests describing local filesystems, DB schemas, and private infrastructure remain entirely local, satisfying strict corporate compliance requirements.</li>
+                    <li><strong>Targeted Security Guardrails</strong>: Fine-tuned specifically to audit prompts, tool instructions, and agent payloads against standard security taxonomies (like the MLCommons hazard catalog).</li>
+                    <li><strong>Low Latency & Footprint</strong>: Executes changes in seconds on standard developer laptops without necessitating large, expensive cloud-hosted reasoning nodes.</li>
+                  </ul>
                 </div>
               </Section>
 
