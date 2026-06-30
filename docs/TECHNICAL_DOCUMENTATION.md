@@ -247,7 +247,15 @@ Defaults operate dynamically in `src/lib/default-policy.ts`.
 - Automatically manages UUID tracking within the `scans` table (schema housing `server_url`, `manifest_json`, and serialized `report_json`).
 - Enables side-by-side UI views allowing direct visual comparison parsing via the `/history` & `/diff` routes to quickly identify delta shifts across deployments.
 
-### 6. Attestation
+### 6. Drift Governance & AI Audit Console
+- **Drift Detection Heuristics**: Compares active scanned tool schemas and parameters against the organization's signed history in SQLite `manifest_approvals`.
+- **Autonomous Audit Agent**: Integrates a Gemini-powered autonomous security auditor that evaluates structural changes side-by-side for prompt injection vectors or capability escalation, and prints real-time reasoning logs.
+- **Reviewer Verdict Actions**: Supports explicit `approved` and `denied` states:
+  - **Approve**: Signs off on the manifest with the agent's proposed key scheme, updates dashboard status to green `Authorized Matches Approval`, and establishes a visual synchronized connection.
+  - **Deny**: Rejects changes, stores a `denied` status in the database, sets dashboard status to red `Rejected / Denied`, and breaks the visual sync flow with a red warning link.
+- **Signed Approvals Trail**: Retains a sequentially ordered list of all historical approvals and denials, decorated with green `Signed` and red `Denied` badges for audit compliance.
+
+### 7. Attestation
 The engine cryptographically validates the final output using RSA-SHA256 digital signing (`src/lib/attestation.ts`). Signatures utilize randomly generated ephemeral keys locally, allowing organizations to substitute custom external KMS infrastructures in true enterprise scenarios.
 
 ---

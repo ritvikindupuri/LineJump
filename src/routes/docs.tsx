@@ -389,17 +389,24 @@ function DocsPage() {
                 </div>
               </Section>
 
-              <Section title="Drift Governance" id="drift-governance">
+              <Section title="Drift Governance & AI Audit Console" id="drift-governance">
                 <div className="prose-sm max-w-none text-muted-foreground space-y-4 leading-relaxed text-[13.5px]">
                   <p>
-                    In active CI/CD pipelines, servers update frequently. The **Drift Governance** page calculates schema differences and lets administrators authorize changes securely.
+                    In active CI/CD pipelines, MCP servers update frequently. LineJump features an interactive <strong>Drift Governance & Change Approval</strong> dashboard to manage schema drift, evaluate safety risks, and maintain a historical audit trail of authorized configurations.
                   </p>
-                  <h4 className="text-sm font-semibold text-foreground mt-4">The Approval Cycle</h4>
+                  
+                  <h4 className="text-sm font-semibold text-foreground mt-4">The Trust-On-First-Use (TOFU) Cycle</h4>
                   <ol className="list-decimal pl-5 space-y-2 text-xs">
-                    <li><strong>Trust-On-First-Use (TOFU)</strong>: When a server registers, it is pinned as `pending`. LineJump redacts tool descriptions in Client `tools/list` returns to prevent LLM triggers until approved.</li>
-                    <li><strong>Drift Analysis</strong>: Any schema modifications (modified parameter, added/removed tools) triggers a Drift warning.</li>
-                    <li><strong>Sign-off</strong>: Reviewers examine side-by-side diffs and click **Approve & Sign Manifest**, saving the hash signature into SQLite `manifest_approvals`.</li>
-                    <li><strong>Bypass Verification</strong>: Verified signatures allow tool calls to execute through the stdio proxy without restriction.</li>
+                    <li><strong>Initial Scan</strong>: Unregistered manifests default to a yellow <em>No Approved Version Found</em> status. LineJump registers the server metadata and computes a unique polynomial manifest hash.</li>
+                    <li><strong>Drift Detection</strong>: If a server's active tools, descriptions, or parameters differ from the last authorized database entry, LineJump flags the server with a <em>Drift Detected Pending Approval</em> warning.</li>
+                    <li><strong>AI-Powered Auditing</strong>: When initiating change authorization, LineJump spawns an <strong>Autonomous AI Security Agent</strong> (powered by Gemini) to compare the changes side-by-side, analyze the diff for injection threats or capability escalation, and stream its thinking process log-by-log.</li>
+                    <li><strong>Audit verdicts & Sign-off</strong>:
+                      <ul className="list-disc pl-5 mt-1 space-y-1">
+                        <li><strong>Approve</strong>: Confirms the configuration, applies a digital signature using the agent's proposed key scheme, and writes an <code>approved</code> status. The dashboard updates to a green <strong>Authorized Matches Approval</strong> status, indicating no active drift.</li>
+                        <li><strong>Deny</strong>: Explicitly rejects the manifest update and writes a <code>denied</code> status. The dashboard updates to a red <strong>Rejected / Denied</strong> status and breaks the visual connection with a red <strong>denied / rejected</strong> warning link.</li>
+                      </ul>
+                    </li>
+                    <li><strong>Signed Approvals Trail</strong>: All approval and denial actions are persisted sequentially in the SQLite database, displaying a color-coded history log (green <code>Signed</code> and red <code>Denied</code> badges) showing timestamps, reviewers, and signing key schemes.</li>
                   </ol>
                 </div>
               </Section>
