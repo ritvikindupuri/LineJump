@@ -1065,7 +1065,10 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSignatureModal(null)}
+                      onClick={() => {
+                        console.log("[CONSOLE] Deny clicked, closing modal.");
+                        setSignatureModal(null);
+                      }}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground"
                     >
                       Deny
@@ -1073,11 +1076,14 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                     <Button
                       size="sm"
                       onClick={async () => {
+                        console.log("[CONSOLE] Approve clicked. Signer:", agentResult?.proposedSignerName, "Scheme:", agentResult?.proposedKeyScheme);
                         setSigning(true);
                         try {
                           await handleSignManifest(agentResult.proposedSignerName, agentResult.proposedKeyScheme);
+                          console.log("[CONSOLE] handleSignManifest completed successfully.");
                           setSignatureModal(null);
                         } catch (err: any) {
+                          console.error("[CONSOLE] Sign-off error:", err);
                           alert(`Sign-off failed: ${err.message || err}`);
                         } finally {
                           setSigning(false);
