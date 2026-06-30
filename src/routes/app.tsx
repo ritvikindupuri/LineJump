@@ -315,6 +315,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
 
   // Enterprise Governance States
   const [activePolicy, setActivePolicy] = useState("default");
+  const [activeModel, setActiveModel] = useState("gemini-2.5-flash");
   const [reportState, setReportState] = useState(report);
   const [workspaceTab, setWorkspaceTab] = useState("findings");
 
@@ -429,7 +430,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     setAgentThinking(currentLogs);
     await new Promise(r => setTimeout(r, 300));
 
-    currentLogs += `\n[AGENT] Dispatching results to Gemini safety model for autonomous audit...\n`;
+    currentLogs += `\n[AGENT] Dispatching results to AI safety model (${activeModel}) for autonomous audit...\n`;
     setAgentThinking(currentLogs);
 
     try {
@@ -438,7 +439,8 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
           serverName: reportState.serverName,
           manifestJson: rawManifest,
           lastApprovedJson: lastApproved?.manifest_json || "",
-          diffsJson: JSON.stringify(diffList, null, 2)
+          diffsJson: JSON.stringify(diffList, null, 2),
+          modelName: activeModel
         }
       });
 
@@ -1052,6 +1054,8 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             }}
             signing={signing}
             apiError={apiError}
+            activeModel={activeModel}
+            setActiveModel={setActiveModel}
           />
         </TabsContent>
       </Tabs>
@@ -1186,6 +1190,8 @@ function DiffGovernancePanel({
   onApprove,
   signing,
   apiError,
+  activeModel,
+  setActiveModel,
 }: {
   report: ScanReport;
   rawManifest: string;
@@ -1194,6 +1200,8 @@ function DiffGovernancePanel({
   onApprove: () => void;
   signing: boolean;
   apiError?: string | null;
+  activeModel: string;
+  setActiveModel: (m: string) => void;
 }) {
   const currentHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
   const isMatch = lastApproved && lastApproved.status === "approved" && lastApproved.manifest_hash === currentHash;
@@ -1366,9 +1374,24 @@ function DiffGovernancePanel({
             <p className="text-xs text-muted-foreground max-w-md">
               Sign off on this manifest configuration. Signed manifests bypass downstream stdio wrapper blocks and are marked as approved in production deployments.
             </p>
-            <Button size="sm" onClick={onApprove} disabled={signing} className="h-8 shrink-0 text-xs bg-green-600 hover:bg-green-700 text-white font-medium">
-              {signing ? "Signing..." : "Approve & Sign Manifest"}
-            </Button>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Audit AI Model:</span>
+                <select
+                  value={activeModel}
+                  onChange={(e) => setActiveModel(e.target.value)}
+                  className="bg-neutral-900 border border-border/80 text-foreground text-[11px] rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary h-8"
+                >
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cloud)</option>
+                  <option value="llama-guard3">Llama Guard 3 (Local)</option>
+                  <option value="granite-guardian">Granite Guardian (Local)</option>
+                  <option value="whiterabbitneo">WhiteRabbitNeo (Local)</option>
+                </select>
+              </div>
+              <Button size="sm" onClick={onApprove} disabled={signing} className="h-8 mt-4.5 text-xs bg-green-600 hover:bg-green-700 text-white font-medium shrink-0">
+                {signing ? "Signing..." : "Approve & Sign Manifest"}
+              </Button>
+            </div>
           </div>
         )}
       </Card>
