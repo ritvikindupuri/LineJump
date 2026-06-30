@@ -32,7 +32,7 @@ import { shareByEmail, copyShareableLink } from "../lib/share";
 import { evaluateCiCheck, DEFAULT_CI_CONFIG, generateCiCheckMarkdown, type CiCheckResult } from "../lib/ci-check";
 import { useScanStore } from "../hooks/use-scan-store";
 import { fetchMcpManifest } from "../lib/mcp-fetch.functions";
-import { deepScanManifest, type DeepScanResult, type DeepScanFinding } from "../lib/deep-scan.functions";
+import { deepScanManifest, runAutonomousSecurityAgentFn, type DeepScanResult, type DeepScanFinding } from "../lib/deep-scan.functions";
 
 export const Route = createFileRoute("/app")({
   component: AppPage,
@@ -336,6 +336,61 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     log: string[];
     signingInProgress?: boolean;
   } | null>(null);
+
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentThinking, setAgentThinking] = useState("");
+  const [agentResult, setAgentResult] = useState<any | null>(null);
+
+  const runSecurityAgentAudit = async () => {
+    setAgentRunning(true);
+    setAgentResult(null);
+    setAgentThinking("Initializing Autonomous AI Security Agent...\n[AGENT] Safety validation model loaded.\n[AGENT] Querying SQLite for last approved signatures...");
+    
+    try {
+      const diffList: string[] = [];
+      if (lastApproved) {
+        try {
+          const appv = JSON.parse(lastApproved.manifest_json);
+          const appvTools = Array.isArray(appv.tools) ? appv.tools : [];
+          const currTools = reportState.bom || [];
+          for (const ct of currTools) {
+            const at = appvTools.find((t: any) => t.name === ct.name);
+            if (!at) {
+              diffList.push(`Added tool: "${ct.name}" - ${ct.description}`);
+            } else if (at.description !== ct.description || JSON.stringify(at.inputSchema ?? {}) !== JSON.stringify(ct.inputSchema ?? {})) {
+              diffList.push(`Modified tool: "${ct.name}" description/schema changed.`);
+            }
+          }
+          for (const at of appvTools) {
+            if (!currTools.find((t: any) => t.name === at.name)) {
+              diffList.push(`Removed tool: "${at.name}"`);
+            }
+          }
+        } catch {}
+      } else {
+        diffList.push("No approved historical manifests recorded in database. Reviewing full manifest scope.");
+      }
+
+      setAgentThinking(prev => prev + `\n[AGENT] Found ${diffList.length} schema changes.\n[AGENT] Sending audit query to Gemini...`);
+
+      const result = await runAutonomousSecurityAgentFn({
+        data: {
+          serverName: reportState.serverName,
+          manifestJson: rawManifest,
+          lastApprovedJson: lastApproved?.manifest_json || "",
+          diffsJson: JSON.stringify(diffList, null, 2)
+        }
+      });
+
+      setAgentThinking(prev => prev + "\n[AGENT] Evaluating safety verdict...\n\n" + result.thinking);
+      setAgentResult(result);
+    } catch (e: any) {
+      console.error(e);
+      setAgentThinking(prev => prev + `\n[AGENT] Audit pipeline failed: ${e.message || e}`);
+    } finally {
+      setAgentRunning(false);
+    }
+  };
 
   const loadApprovals = async () => {
     try {
@@ -916,7 +971,10 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             rawManifest={rawManifest}
             lastApproved={lastApproved}
             approvalsHistory={approvalsHistory}
-            onApprove={() => setSignatureModal({ step: 1, checked: false, reviewer: "Security Administrator", keyType: "LineJump HSM Key", log: [] })}
+            onApprove={async () => {
+              setSignatureModal({ step: 1, checked: false, reviewer: "Security Administrator", keyType: "LineJump HSM Key", log: [] });
+              await runSecurityAgentAudit();
+            }}
             signing={signing}
           />
         </TabsContent>
@@ -929,89 +987,91 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
               <div>
                 <h3 className="text-base font-semibold flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-green-500" />
-                  MCP Manifest Sign-off Portal
+                  Autonomous AI Security Audit Console
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Authorizing downstream server schemas</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Gemini-powered manifest sign-off check</p>
               </div>
-              {!signatureModal.signingInProgress && (
-                <Button variant="ghost" size="sm" onClick={() => setSignatureModal(null)}>Cancel</Button>
-              )}
+              <Button variant="ghost" size="sm" onClick={() => setSignatureModal(null)} disabled={signing}>Cancel</Button>
             </div>
 
-            {signatureModal.step === 1 && (
-              <div className="space-y-4">
-                <div className="bg-muted/40 p-4 rounded-lg border border-border/50 space-y-2 text-xs">
-                  <div><strong>Server Name:</strong> {reportState.serverName}</div>
-                  <div><strong>Server Version:</strong> {reportState.version || "1.0.0"}</div>
-                  <div><strong>Manifest Hash:</strong> <span className="font-mono text-muted-foreground font-medium">{"h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16)}</span></div>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    id="sign-check"
-                    checked={signatureModal.checked}
-                    onChange={(e) => setSignatureModal({ ...signatureModal, checked: e.target.checked })}
-                    className="mt-0.5 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <Label htmlFor="sign-check" className="text-xs text-muted-foreground leading-normal font-normal cursor-pointer">
-                    I confirm that I have reviewed the schema differences, verified the active capabilities, and authorize this manifest version for production deployment.
-                  </Label>
-                </div>
-                <div className="flex justify-end pt-2">
-                  <Button
-                    size="sm"
-                    disabled={!signatureModal.checked}
-                    onClick={() => setSignatureModal({ ...signatureModal, step: 2 })}
-                    className="h-8 text-xs bg-primary text-primary-foreground font-medium"
-                  >
-                    Proceed to Identity
-                  </Button>
+            <div className="space-y-4">
+              {/* Agent Log Console */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Agent Thinking Process:</span>
+                <div className="bg-neutral-950 text-neutral-200 p-3.5 rounded-lg border border-border/80 font-mono text-[10.5px] leading-relaxed max-h-[220px] overflow-y-auto whitespace-pre-wrap shadow-inner custom-scrollbar">
+                  {agentThinking}
+                  {agentRunning && (
+                    <span className="inline-block w-1.5 h-3 bg-green-500 ml-0.5 animate-pulse" />
+                  )}
                 </div>
               </div>
-            )}
 
-            {signatureModal.step === 2 && (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground">Signer Name / Reviewer Identity</Label>
-                    <Input
-                      type="text"
-                      value={signatureModal.reviewer}
-                      onChange={(e) => setSignatureModal({ ...signatureModal, reviewer: e.target.value })}
-                      className="mt-1 h-8 text-xs"
-                      placeholder="e.g. Security Admin"
-                    />
+              {/* Agent Decision Panel */}
+              {!agentRunning && agentResult && (
+                <div className="space-y-3.5 pt-2 border-t border-border/20">
+                  {agentResult.safetyDecision === "safe" ? (
+                    <div className="bg-green-500/10 border border-green-500/20 p-3.5 rounded-lg flex items-start gap-2.5 text-xs text-green-500">
+                      <CheckCircle className="h-4.5 w-4.5 shrink-0 text-green-500 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Agent Audit Verdict: SAFE TO AUTHORIZE</span>
+                        <p className="text-muted-foreground text-[11px] mt-1">{agentResult.explanation}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-lg flex items-start gap-2.5 text-xs text-red-500">
+                      <ShieldAlert className="h-4.5 w-4.5 shrink-0 text-red-500 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Agent Audit Verdict: BLOCK & REJECT (UNSAFE)</span>
+                        <p className="text-muted-foreground text-[11px] mt-1">{agentResult.explanation}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Proposed Signature Parameters */}
+                  <div className="bg-muted/40 p-3 rounded-lg border border-border/40 text-[11px] space-y-1">
+                    <div><strong>Proposed Signer:</strong> <span className="text-foreground">{agentResult.proposedSignerName}</span></div>
+                    <div><strong>Proposed Key Scheme:</strong> <span className="text-foreground">{agentResult.proposedKeyScheme}</span></div>
                   </div>
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground">Signing Token/Key Scheme</Label>
-                    <select
-                      value={signatureModal.keyType}
-                      onChange={(e) => setSignatureModal({ ...signatureModal, keyType: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+
+                  {/* Simple Allow / Deny buttons */}
+                  <div className="flex justify-between items-center pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSignatureModal(null)}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      <option>LineJump HSM Key</option>
-                      <option>Local SSH Key (ED25519)</option>
-                      <option>GPG Signature Key</option>
-                      <option>Developer Signature</option>
-                    </select>
+                      Deny & Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        setSigning(true);
+                        try {
+                          await handleSignManifest(agentResult.proposedSignerName, agentResult.proposedKeyScheme);
+                          setSignatureModal(null);
+                        } catch (err: any) {
+                          alert(`Sign-off failed: ${err.message || err}`);
+                        } finally {
+                          setSigning(false);
+                        }
+                      }}
+                      disabled={signing}
+                      className={`h-8 text-xs text-white font-medium ${agentResult.safetyDecision === "safe" ? "bg-green-600 hover:bg-green-700" : "bg-yellow-600 hover:bg-yellow-700"}`}
+                    >
+                      {signing ? "Authorizing..." : agentResult.safetyDecision === "safe" ? "Allow & Sign Manifest" : "Override & Sign"}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2">
-                  <Button variant="ghost" size="sm" disabled={signing} onClick={() => setSignatureModal({ ...signatureModal, step: 1 })} className="h-8 text-xs">
-                    Back
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={!signatureModal.reviewer.trim() || signing}
-                    onClick={executeSignatureFlow}
-                    className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white font-medium"
-                  >
-                    {signing ? "Signing..." : "Generate Signature & Sign"}
-                  </Button>
+              )}
+
+              {agentRunning && (
+                <div className="flex items-center justify-center py-6 gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                  <span className="text-xs text-muted-foreground">Autonomous Security Agent is evaluating manifest...</span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </Card>
         </div>
       )}

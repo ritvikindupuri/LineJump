@@ -177,3 +177,120 @@ function validateSeverity(s: string): RiskSeverity {
   const valid: RiskSeverity[] = ["critical", "high", "medium", "low", "info"];
   return valid.includes(s as RiskSeverity) ? (s as RiskSeverity) : "info";
 }
+
+export interface AutonomousAgentInput {
+  serverName: string;
+  manifestJson: string;
+  lastApprovedJson?: string;
+  diffsJson: string;
+}
+
+export interface AutonomousAgentResult {
+  thinking: string;
+  safetyDecision: "safe" | "unsafe";
+  proposedSignerName: string;
+  proposedKeyScheme: string;
+  explanation: string;
+  error?: string;
+}
+
+const AGENT_SYSTEM_PROMPT = `
+You are the LineJump Autonomous AI Security Agent. Your job is to analyze the difference between a newly scanned MCP manifest schema and the last approved version, then make a recommendation to allow (sign) or deny (block) it.
+
+Guidelines:
+- Review any added tools, modified input schemas, or changes in tool descriptions.
+- Look out for line-jumping threats: tools that attempt shell/command execution (e.g. bash, cmd, run), confidential file reads, external webhook logs/exfiltration, credential dumping, or bypassing authorization.
+- Output detailed, clear, professional step-by-step thinking explaining your reasoning.
+- Provide a clear verdict: "safe" (if changes are benign, minor, or represent standard utility tools) or "unsafe" (if changes expose critical security hazards, destructive tools, or exfiltration risks).
+
+You MUST respond ONLY with a valid JSON object matching this schema:
+{
+  "thinking": "Step-by-step reasoning details explaining what you found and analyzed...",
+  "safetyDecision": "safe" | "unsafe",
+  "proposedSignerName": "LineJump AI Security Agent",
+  "proposedKeyScheme": "LineJump HSM Key",
+  "explanation": "A summary explanation of your recommendation to the user."
+}
+`;
+
+export const runAutonomousSecurityAgentFn = createServerFn({ method: "POST" })
+  .validator((d: unknown) => {
+    const input = d as AutonomousAgentInput;
+    if (!input.serverName || !input.manifestJson) throw new Error("serverName and manifestJson required");
+    return input;
+  })
+  .handler(async ({ data }): Promise<AutonomousAgentResult> => {
+    checkRateLimit("agent", 20, 60000);
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) {
+      return {
+        thinking: "API Key not configured. Autonomous analysis cannot run.\nPlease set GEMINI_API_KEY or GOOGLE_API_KEY in your environment.",
+        safetyDecision: "safe",
+        proposedSignerName: "LineJump AI Security Agent (Offline)",
+        proposedKeyScheme: "Developer Signature",
+        explanation: "Gemini API key is missing. Please configure it to enable live autonomous security agent auditing."
+      };
+    }
+
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Analyze this schema change audit request:\n\nServer Name: ${data.serverName}\n\nIncoming Manifest:\n${data.manifestJson}\n\nLast Approved Manifest:\n${data.lastApprovedJson || "None"}\n\nDetected Schema Diffs:\n${data.diffsJson}`,
+                  },
+                ],
+              },
+            ],
+            systemInstruction: {
+              parts: [
+                {
+                  text: AGENT_SYSTEM_PROMPT,
+                },
+              ],
+            },
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "Unknown error");
+        throw new Error(`API returned status ${response.status}: ${errText}`);
+      }
+
+      const resData = await response.json();
+      const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("Empty response from Gemini");
+
+      const parsed = JSON.parse(text);
+      return {
+        thinking: parsed.thinking || "No thinking provided.",
+        safetyDecision: parsed.safetyDecision === "unsafe" ? "unsafe" : "safe",
+        proposedSignerName: parsed.proposedSignerName || "LineJump AI Security Agent",
+        proposedKeyScheme: parsed.proposedKeyScheme || "LineJump HSM Key",
+        explanation: parsed.explanation || "Analysis complete."
+      };
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : "Unknown error";
+      return {
+        thinking: `Agent execution failed: ${errMsg}`,
+        safetyDecision: "unsafe",
+        proposedSignerName: "LineJump AI Security Agent (Error)",
+        proposedKeyScheme: "Developer Signature",
+        explanation: "An error occurred during agent analysis: " + errMsg
+      };
+    }
+  });
