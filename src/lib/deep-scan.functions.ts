@@ -222,122 +222,46 @@ export const runAutonomousSecurityAgentFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<AutonomousAgentResult> => {
     checkRateLimit("agent", 20, 60000);
-    const model = data.modelName || process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
-    const isOllamaModel = ["llama-guard3", "granite-guardian", "whiterabbitneo"].includes(model);
-
-    if (isOllamaModel) {
-      try {
-        const ollamaRes = await fetch("http://localhost:11434/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: model === "llama-guard3" ? "llama-guard3" : model === "granite-guardian" ? "granite-guardian:8b" : "whiterabbitneo",
-            prompt: `System Prompt:\n${AGENT_SYSTEM_PROMPT}\n\nTask Request:\nAnalyze this schema change audit request:\n\nServer Name: ${data.serverName}\n\nIncoming Manifest:\n${data.manifestJson}\n\nLast Approved Manifest:\n${data.lastApprovedJson || "None"}\n\nDetected Schema Diffs:\n${data.diffsJson}`,
-            stream: false,
-            format: "json"
-          })
-        });
-
-        if (!ollamaRes.ok) {
-          throw new Error(`Ollama returned status ${ollamaRes.status}`);
-        }
-
-        const resJson = await ollamaRes.json() as any;
-        const text = resJson.response;
-        if (!text) throw new Error("Empty response from Ollama model");
-
-        const parsed = JSON.parse(text);
-        return {
-          thinking: parsed.thinking || "No thinking provided.",
-          safetyDecision: parsed.safetyDecision === "unsafe" ? "unsafe" : "safe",
-          proposedSignerName: parsed.proposedSignerName || `LineJump Local Agent (${model})`,
-          proposedKeyScheme: parsed.proposedKeyScheme || "Local Security Signature",
-          explanation: parsed.explanation || "Analysis complete."
-        };
-      } catch (e: any) {
-        const errMsg = e.message || e;
-        return {
-          thinking: `Local AI Security Model (${model}) execution failed: ${errMsg}`,
-          safetyDecision: "unsafe",
-          proposedSignerName: `LineJump Local Agent (Error)`,
-          proposedKeyScheme: "Offline Fallback Signature",
-          explanation: `Failed to connect to local Ollama server running '${model}'.\n\nTo run locally:\n1. Install Ollama (https://ollama.com)\n2. Start Ollama and run: 'ollama run ${model === "llama-guard3" ? "llama-guard3" : model === "granite-guardian" ? "granite-guardian:8b" : "whiterabbitneo"}'\n3. Retry the audit.`
-        };
-      }
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-
-    if (!apiKey) {
-      return {
-        thinking: "API Key not configured. Autonomous analysis cannot run.\nPlease set GEMINI_API_KEY or GOOGLE_API_KEY in your environment.",
-        safetyDecision: "safe",
-        proposedSignerName: "LineJump AI Security Agent (Offline)",
-        proposedKeyScheme: "Developer Signature",
-        explanation: "Gemini API key is missing. Please configure it to enable live autonomous security agent auditing."
-      };
-    }
+    const model = data.modelName === "gemini-2.5-flash" || !data.modelName ? "llama-guard3" : data.modelName;
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Analyze this schema change audit request:\n\nServer Name: ${data.serverName}\n\nIncoming Manifest:\n${data.manifestJson}\n\nLast Approved Manifest:\n${data.lastApprovedJson || "None"}\n\nDetected Schema Diffs:\n${data.diffsJson}`,
-                  },
-                ],
-              },
-            ],
-            systemInstruction: {
-              parts: [
-                {
-                  text: AGENT_SYSTEM_PROMPT,
-                },
-              ],
-            },
-            generationConfig: {
-              responseMimeType: "application/json",
-            },
-          }),
-        }
-      );
+      const ollamaRes = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model === "llama-guard3" ? "llama-guard3" : model === "granite-guardian" ? "granite-guardian:8b" : "whiterabbitneo",
+          prompt: `System Prompt:\n${AGENT_SYSTEM_PROMPT}\n\nTask Request:\nAnalyze this schema change audit request:\n\nServer Name: ${data.serverName}\n\nIncoming Manifest:\n${data.manifestJson}\n\nLast Approved Manifest:\n${data.lastApprovedJson || "None"}\n\nDetected Schema Diffs:\n${data.diffsJson}`,
+          stream: false,
+          format: "json"
+        })
+      });
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "Unknown error");
-        throw new Error(`API returned status ${response.status}: ${errText}`);
+      if (!ollamaRes.ok) {
+        throw new Error(`Ollama returned status ${ollamaRes.status}`);
       }
 
-      const resData = await response.json();
-      const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Empty response from Gemini");
+      const resJson = await ollamaRes.json() as any;
+      const text = resJson.response;
+      if (!text) throw new Error("Empty response from Ollama model");
 
       const parsed = JSON.parse(text);
       return {
         thinking: parsed.thinking || "No thinking provided.",
         safetyDecision: parsed.safetyDecision === "unsafe" ? "unsafe" : "safe",
-        proposedSignerName: parsed.proposedSignerName || "LineJump AI Security Agent",
-        proposedKeyScheme: parsed.proposedKeyScheme || "LineJump HSM Key",
+        proposedSignerName: parsed.proposedSignerName || `LineJump Local Agent (${model})`,
+        proposedKeyScheme: parsed.proposedKeyScheme || "Local Security Signature",
         explanation: parsed.explanation || "Analysis complete."
       };
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : "Unknown error";
+    } catch (e: any) {
+      const errMsg = e.message || e;
       return {
-        thinking: `Agent execution failed: ${errMsg}`,
+        thinking: `Local AI Security Model (${model}) execution failed: ${errMsg}`,
         safetyDecision: "unsafe",
-        proposedSignerName: "LineJump AI Security Agent (Error)",
-        proposedKeyScheme: "Developer Signature",
-        explanation: "An error occurred during agent analysis: " + errMsg
+        proposedSignerName: `LineJump Local Agent (Error)`,
+        proposedKeyScheme: "Offline Fallback Signature",
+        explanation: `Failed to connect to local Ollama server running '${model}'.\n\nTo run locally:\n1. Install Ollama (https://ollama.com)\n2. Start Ollama and run: 'ollama run ${model === "llama-guard3" ? "llama-guard3" : model === "granite-guardian" ? "granite-guardian:8b" : "whiterabbitneo"}'\n3. Retry the audit.`
       };
     }
   });

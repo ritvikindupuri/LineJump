@@ -315,7 +315,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
 
   // Enterprise Governance States
   const [activePolicy, setActivePolicy] = useState("default");
-  const [activeModel, setActiveModel] = useState("gemini-2.5-flash");
+  const [activeModel, setActiveModel] = useState("llama-guard3");
   const [reportState, setReportState] = useState(report);
   const [workspaceTab, setWorkspaceTab] = useState("findings");
 
@@ -1382,7 +1382,6 @@ function DiffGovernancePanel({
                   onChange={(e) => setActiveModel(e.target.value)}
                   className="bg-neutral-900 border border-border/80 text-foreground text-[11px] rounded px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary h-8"
                 >
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cloud)</option>
                   <option value="llama-guard3">Llama Guard 3 (Local)</option>
                   <option value="granite-guardian">Granite Guardian (Local)</option>
                   <option value="whiterabbitneo">WhiteRabbitNeo (Local)</option>
