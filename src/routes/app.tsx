@@ -340,6 +340,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const [agentRunning, setAgentRunning] = useState(false);
   const [agentThinking, setAgentThinking] = useState("");
   const [agentResult, setAgentResult] = useState<any | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const runSecurityAgentAudit = async () => {
     setAgentRunning(true);
@@ -421,12 +422,14 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
 
   const loadApprovals = async () => {
     try {
+      setApiError(null);
       const latest = await getLatestApprovedManifestFn({ serverName: reportState.serverName });
       setLastApproved(latest);
       const list = await getManifestApprovalsFn({ serverName: reportState.serverName });
       setApprovalsHistory(list);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setApiError(`Failed to load approvals: ${e.message || e}`);
     }
   };
 
@@ -453,6 +456,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
 
   const handleSignManifest = async (reviewerName: string, keyScheme: string) => {
     setSigning(true);
+    setApiError(null);
     try {
       const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
       await approveManifestFn({
@@ -465,8 +469,9 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
         }
       });
       await loadApprovals();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setApiError(`Failed to sign manifest: ${e.message || e}`);
       throw e;
     } finally {
       setSigning(false);
@@ -1003,6 +1008,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
               await runSecurityAgentAudit();
             }}
             signing={signing}
+            apiError={apiError}
           />
         </TabsContent>
       </Tabs>
@@ -1022,6 +1028,12 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             </div>
 
             <div className="space-y-4">
+              {apiError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-xs font-semibold">
+                  {apiError}
+                </div>
+              )}
+
               {/* Agent Log Console */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Agent Thinking Process:</span>
@@ -1120,6 +1132,7 @@ function DiffGovernancePanel({
   approvalsHistory,
   onApprove,
   signing,
+  apiError,
 }: {
   report: ScanReport;
   rawManifest: string;
@@ -1127,6 +1140,7 @@ function DiffGovernancePanel({
   approvalsHistory: any[];
   onApprove: () => void;
   signing: boolean;
+  apiError?: string | null;
 }) {
   const currentHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
   const isMatch = lastApproved && lastApproved.manifest_hash === currentHash;
@@ -1169,6 +1183,12 @@ function DiffGovernancePanel({
 
   return (
     <div className="space-y-4">
+      {apiError && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-xs font-semibold animate-pulse">
+          {apiError}
+        </div>
+      )}
+
       <Card className="border-border/50 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
