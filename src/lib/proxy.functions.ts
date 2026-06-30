@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import * as db from "./db";
 
-export const getProxyLogsFn = createServerFn({ method: "GET" })
+export const getProxyLogsFn = createServerFn({ method: "POST" })
   .validator((d: { limit?: number }) => d || {})
   .handler(async ({ data }) => {
     return await db.getProxyLogs(data.limit);
   });
 
-export const getPinnedToolsFn = createServerFn({ method: "GET" })
+export const getPinnedToolsFn = createServerFn({ method: "POST" })
   .validator((d: { serverName?: string }) => d || {})
   .handler(async ({ data }) => {
     return await db.getPinnedTools(data.serverName);
@@ -33,7 +33,7 @@ export const blockPinnedToolFn = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const getQuarantinedResponsesFn = createServerFn({ method: "GET" })
+export const getQuarantinedResponsesFn = createServerFn({ method: "POST" })
   .handler(async () => {
     return await db.getQuarantinedResponses();
   });
@@ -48,7 +48,7 @@ export const releaseQuarantineFn = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const getManifestApprovalsFn = createServerFn({ method: "GET" })
+export const getManifestApprovalsFn = createServerFn({ method: "POST" })
   .validator((d: { serverName?: string } | undefined) => d || {})
   .handler(async ({ data }) => {
     return await db.getManifestApprovals(data.serverName);
@@ -64,7 +64,7 @@ export const approveManifestFn = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const getLatestApprovedManifestFn = createServerFn({ method: "GET" })
+export const getLatestApprovedManifestFn = createServerFn({ method: "POST" })
   .validator((d: { serverName: string }) => {
     if (!d.serverName) throw new Error("serverName is required");
     return d;
@@ -72,4 +72,3 @@ export const getLatestApprovedManifestFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     return await db.getLatestApprovedManifest(data.serverName);
   });
-
