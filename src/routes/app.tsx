@@ -299,7 +299,7 @@ function FindingCard({ finding }: { finding: Finding }) {
         )}
       </div>
       <p className="text-sm font-medium">{finding.title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{finding.detail}</p>
+      <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{renderMarkdown(finding.detail)}</div>
       {finding.evidence && (
         <div className="mt-2 rounded-md bg-muted/50 px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground break-all">
           {finding.evidence}
@@ -331,7 +331,7 @@ function DeepFindingCard({ finding }: { finding: DeepScanFinding }) {
         </div>
       </div>
       <p className="text-sm font-medium">{finding.title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{finding.detail}</p>
+      <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{renderMarkdown(finding.detail)}</div>
       {finding.evidence && (
         <div className="mt-2 rounded-md bg-muted/50 px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground break-all">
           {finding.evidence}

@@ -45,7 +45,10 @@ For each finding, specify:
 - severity: "critical" | "high" | "medium" | "low" | "info"
 - category: a short category name
 - title: concise finding title
-- detail: detailed explanation
+- detail: a detailed explanation structured EXACTLY with these three bullet points in markdown:
+  * **Description**: [Detailed description of the concern]
+  * **Importance**: [Why it is important in the context of the pasted MCP server code]
+  * **Remediation**: [Actionable steps to resolve this concern]
 - toolName: the affected tool name (if applicable)
 - evidence: the specific text that triggered the finding
 - llmReasoning: why you classified this the way you did
