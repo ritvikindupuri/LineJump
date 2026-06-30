@@ -116,6 +116,18 @@ export const deepScanManifest = createServerFn({ method: "POST" })
         scoreVal = parsed.llmScore <= 1 ? Math.round(parsed.llmScore * 100) : parsed.llmScore;
       }
 
+      if (hasFindings) {
+        let penalty = 0;
+        findingsList.forEach((f: any) => {
+          const sev = (f.severity || "medium").toLowerCase();
+          if (sev === "critical") penalty += 50;
+          else if (sev === "high") penalty += 30;
+          else if (sev === "medium") penalty += 15;
+          else penalty += 5;
+        });
+        scoreVal = Math.max(0, Math.min(scoreVal, 100 - penalty));
+      }
+
       return {
         findings: findingsList.map((f: any) => ({
           severity: validateSeverity(f.severity),
