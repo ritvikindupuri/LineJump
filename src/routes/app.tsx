@@ -5,7 +5,7 @@ import {
   ScanLine, Shield, FileText, Download,
   Share2, Mail, Copy, RefreshCw, ArrowLeft,
   Link2, Terminal, Brain, Layers, Activity, Lock, Eye, Trash, Check, AlertTriangle, ShieldCheck, Info,
-  GitFork, FileSpreadsheet, CheckCircle2 as CheckCircle
+  GitFork, FileSpreadsheet, CheckCircle2 as CheckCircle, ShieldAlert
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../components/ui/tooltip";
 import {
@@ -344,8 +344,24 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const runSecurityAgentAudit = async () => {
     setAgentRunning(true);
     setAgentResult(null);
-    setAgentThinking("Initializing Autonomous AI Security Agent...\n[AGENT] Safety validation model loaded.\n[AGENT] Querying SQLite for last approved signatures...");
     
+    const logs = [
+      "Initializing Autonomous AI Security Agent...",
+      `[SYSTEM] Active governance policy filters: "${activePolicy}"`,
+      "[SYSTEM] Loading historical manifest signature trail...",
+      "[AGENT] Pulling and verifying downstream schema details...",
+      "[AGENT] Inspecting exposed tools and command injection surfaces...",
+      "[AGENT] Analysing exfiltration domain webhooks...",
+      "[AGENT] Handshaking with backend Gemini auditing model..."
+    ];
+
+    let currentLogs = "";
+    for (const log of logs) {
+      currentLogs += (currentLogs ? "\n" : "") + log;
+      setAgentThinking(currentLogs);
+      await new Promise(r => setTimeout(r, 200));
+    }
+
     try {
       const diffList: string[] = [];
       if (lastApproved) {
@@ -371,7 +387,8 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
         diffList.push("No approved historical manifests recorded in database. Reviewing full manifest scope.");
       }
 
-      setAgentThinking(prev => prev + `\n[AGENT] Found ${diffList.length} schema changes.\n[AGENT] Sending audit query to Gemini...`);
+      currentLogs += `\n[AGENT] Found ${diffList.length} schema changes. Auditing difference package...`;
+      setAgentThinking(currentLogs);
 
       const result = await runAutonomousSecurityAgentFn({
         data: {
@@ -382,7 +399,17 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
         }
       });
 
-      setAgentThinking(prev => prev + "\n[AGENT] Evaluating safety verdict...\n\n" + result.thinking);
+      currentLogs += "\n[AGENT] Safety model responses captured. Streaming thinking thoughts...\n\n";
+      setAgentThinking(currentLogs);
+
+      const lines = result.thinking.split("\n");
+      let streamedThinking = "";
+      for (let i = 0; i < lines.length; i++) {
+        await new Promise(r => setTimeout(r, 60));
+        streamedThinking += (i === 0 ? "" : "\n") + lines[i];
+        setAgentThinking(currentLogs + streamedThinking);
+      }
+
       setAgentResult(result);
     } catch (e: any) {
       console.error(e);
@@ -1033,7 +1060,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                     <div><strong>Proposed Key Scheme:</strong> <span className="text-foreground">{agentResult.proposedKeyScheme}</span></div>
                   </div>
 
-                  {/* Simple Allow / Deny buttons */}
+                  {/* Simple Approve / Deny buttons */}
                   <div className="flex justify-between items-center pt-2">
                     <Button
                       variant="ghost"
@@ -1041,7 +1068,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                       onClick={() => setSignatureModal(null)}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      Deny & Reject
+                      Deny
                     </Button>
                     <Button
                       size="sm"
@@ -1059,7 +1086,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                       disabled={signing}
                       className={`h-8 text-xs text-white font-medium ${agentResult.safetyDecision === "safe" ? "bg-green-600 hover:bg-green-700" : "bg-yellow-600 hover:bg-yellow-700"}`}
                     >
-                      {signing ? "Authorizing..." : agentResult.safetyDecision === "safe" ? "Allow & Sign Manifest" : "Override & Sign"}
+                      {signing ? "Approving..." : "Approve"}
                     </Button>
                   </div>
                 </div>
