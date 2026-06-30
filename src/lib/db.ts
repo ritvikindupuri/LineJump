@@ -391,10 +391,10 @@ export async function getManifestApprovals(serverName?: string): Promise<any[]> 
   return db.prepare("SELECT * FROM manifest_approvals ORDER BY approved_at DESC").all() as any[];
 }
 
-export async function approveManifest(serverName: string, manifestHash: string, manifestJson: string, approvedBy = "security_admin", keyScheme = "LineJump HSM Key"): Promise<void> {
+export async function approveManifest(serverName: string, manifestHash: string, manifestJson: string, approvedBy = "security_admin", keyScheme = "LineJump HSM Key", status = "approved"): Promise<void> {
   const db = await getDb();
-  db.prepare("INSERT INTO manifest_approvals (id, server_name, manifest_hash, manifest_json, status, approved_by, key_scheme) VALUES (?, ?, ?, ?, 'approved', ?, ?)")
-    .run(crypto.randomUUID(), serverName, manifestHash, manifestJson, approvedBy, keyScheme);
+  db.prepare("INSERT INTO manifest_approvals (id, server_name, manifest_hash, manifest_json, status, approved_by, key_scheme) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(crypto.randomUUID(), serverName, manifestHash, manifestJson, status, approvedBy, keyScheme);
 }
 
 export async function getLatestApprovedManifest(serverName: string): Promise<any | null> {

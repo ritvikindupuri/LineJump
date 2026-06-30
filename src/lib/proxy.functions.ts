@@ -66,7 +66,7 @@ export const approveManifestFn = createServerFn({ method: "POST" })
     return payload;
   })
   .handler(async ({ data }) => {
-    await db.approveManifest(data.serverName, data.manifestHash, data.manifestJson, data.approvedBy, data.keyScheme);
+    await db.approveManifest(data.serverName, data.manifestHash, data.manifestJson, data.approvedBy, data.keyScheme, data.status || "approved");
     return { success: true };
   });
 

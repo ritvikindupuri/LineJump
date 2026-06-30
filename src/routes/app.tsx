@@ -5,7 +5,7 @@ import {
   ScanLine, Shield, FileText, Download,
   Share2, Mail, Copy, RefreshCw, ArrowLeft,
   Link2, Terminal, Brain, Layers, Activity, Lock, Eye, Trash, Check, AlertTriangle, ShieldCheck, Info,
-  GitFork, FileSpreadsheet, CheckCircle2 as CheckCircle, ShieldAlert
+  GitFork, FileSpreadsheet, CheckCircle2 as CheckCircle, ShieldAlert, X
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../components/ui/tooltip";
 import {
@@ -454,7 +454,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     }
   };
 
-  const handleSignManifest = async (reviewerName: string, keyScheme: string) => {
+  const handleSignManifest = async (reviewerName: string, keyScheme: string, status = "approved") => {
     setSigning(true);
     setApiError(null);
     try {
@@ -465,7 +465,8 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
           manifestHash: clientHash,
           manifestJson: rawManifest,
           approvedBy: reviewerName || "Security Administrator",
-          keyScheme: keyScheme || "LineJump HSM Key"
+          keyScheme: keyScheme || "LineJump HSM Key",
+          status: status
         }
       });
       await loadApprovals();
@@ -1071,13 +1072,24 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        console.log("[CONSOLE] Deny clicked, closing modal.");
-                        setSignatureModal(null);
+                      onClick={async () => {
+                        console.log("[CONSOLE] Deny clicked. Signer:", agentResult?.proposedSignerName);
+                        setSigning(true);
+                        try {
+                          await handleSignManifest(agentResult.proposedSignerName, agentResult.proposedKeyScheme, "denied");
+                          console.log("[CONSOLE] Deny completed successfully.");
+                          setSignatureModal(null);
+                        } catch (err: any) {
+                          console.error("[CONSOLE] Deny error:", err);
+                          alert(`Deny failed: ${err.message || err}`);
+                        } finally {
+                          setSigning(false);
+                        }
                       }}
+                      disabled={signing}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      Deny
+                      {signing ? "Denying..." : "Deny"}
                     </Button>
                     <Button
                       size="sm"
@@ -1085,7 +1097,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                         console.log("[CONSOLE] Approve clicked. Signer:", agentResult?.proposedSignerName, "Scheme:", agentResult?.proposedKeyScheme);
                         setSigning(true);
                         try {
-                          await handleSignManifest(agentResult.proposedSignerName, agentResult.proposedKeyScheme);
+                          await handleSignManifest(agentResult.proposedSignerName, agentResult.proposedKeyScheme, "approved");
                           console.log("[CONSOLE] handleSignManifest completed successfully.");
                           setSignatureModal(null);
                         } catch (err: any) {
@@ -1137,7 +1149,7 @@ function DiffGovernancePanel({
   apiError?: string | null;
 }) {
   const currentHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
-  const isMatch = lastApproved && lastApproved.manifest_hash === currentHash;
+  const isMatch = lastApproved && lastApproved.status === "approved" && lastApproved.manifest_hash === currentHash;
 
   // Compile schema diff details
   const diffs: Array<{ type: "add" | "remove" | "modify"; name: string; detail: string }> = [];
@@ -1184,7 +1196,11 @@ function DiffGovernancePanel({
             <p className="text-xs text-muted-foreground">Verify manifest schema drift against signed approvals.</p>
           </div>
           {lastApproved ? (
-            isMatch ? (
+            lastApproved.status === "denied" ? (
+              <Badge variant="outline" className="text-[10px] font-semibold text-red-500 bg-red-500/10 border-red-500/20 px-2 py-0.5 uppercase">
+                Rejected / Denied
+              </Badge>
+            ) : isMatch ? (
               <Badge variant="outline" className="text-[10px] font-semibold text-green-500 bg-green-500/10 border-green-500/20 px-2 py-0.5 uppercase">
                 Authorized Matches Approval
               </Badge>
@@ -1211,7 +1227,16 @@ function DiffGovernancePanel({
 
           {/* Connection sync logic */}
           <div className="flex flex-col items-center shrink-0 w-full md:w-auto">
-            {isMatch ? (
+            {lastApproved && lastApproved.status === "denied" ? (
+              <>
+                <span className="text-[9px] font-mono uppercase tracking-widest text-red-500 font-semibold mb-1">denied / rejected</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-red-500" />
+                  <X className="h-4.5 w-4.5 text-red-500 bg-red-500/15 rounded-full p-0.5" />
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-red-500" />
+                </div>
+              </>
+            ) : isMatch ? (
               <>
                 <span className="text-[9px] font-mono uppercase tracking-widest text-green-500 font-semibold mb-1">synchronized</span>
                 <div className="flex items-center gap-1.5">
@@ -1243,10 +1268,12 @@ function DiffGovernancePanel({
 
           {/* Node 2: Database Approved Signature */}
           <div className="flex-1 p-3 rounded-lg border border-border/60 bg-background/50 text-xs w-full max-w-[220px]">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block mb-1.5">Approved Signature</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block mb-1.5">
+              {lastApproved && lastApproved.status === "denied" ? "Rejected Signature" : "Approved Signature"}
+            </span>
             {lastApproved ? (
               <>
-                <div className="font-mono font-bold text-foreground text-[12px] truncate">{lastApproved.manifest_hash}</div>
+                <div className={`font-mono font-bold text-[12px] truncate ${lastApproved.status === "denied" ? "text-red-500" : "text-foreground"}`}>{lastApproved.manifest_hash}</div>
                 <div className="text-[10px] text-muted-foreground mt-1 truncate">By: {lastApproved.approved_by}</div>
               </>
             ) : (
@@ -1309,13 +1336,19 @@ function DiffGovernancePanel({
             </p>
           ) : (
             approvalsHistory.map((h) => (
-              <Card key={h.id} className="border-border/40 p-3 flex justify-between items-center text-xs">
+              <Card key={h.id} className={`border-border/40 p-3 flex justify-between items-center text-xs ${h.status === "denied" ? "bg-red-500/[0.01]" : ""}`}>
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-medium text-muted-foreground">{h.manifest_hash}</span>
-                    <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] px-1 py-0 uppercase">Signed</Badge>
+                    {h.status === "denied" ? (
+                      <Badge className="bg-red-500/10 text-red-500 border-none text-[9px] px-1 py-0 uppercase">Denied</Badge>
+                    ) : (
+                      <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] px-1 py-0 uppercase">Signed</Badge>
+                    )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Approved by {h.approved_by} using <span className="font-semibold text-foreground/80">{h.key_scheme || "LineJump HSM Key"}</span></p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {h.status === "denied" ? "Denied" : "Approved"} by {h.approved_by} using <span className="font-semibold text-foreground/80">{h.key_scheme || "LineJump HSM Key"}</span>
+                  </p>
                 </div>
                 <span className="text-muted-foreground text-[10px]">{new Date(h.approved_at).toLocaleString()}</span>
               </Card>
