@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   BookOpen,
@@ -219,6 +219,28 @@ function DocsPage() {
     { id: "cli-ci", label: "CLI & CI Integration", icon: GitBranch },
   ];
 
+  const [activeId, setActiveId] = useState("platform-overview");
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveId(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: "-20% 0px -60% 0px", threshold: 0.1 }
+    );
+
+    sections.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Sticky Header */}
@@ -243,16 +265,28 @@ function DocsPage() {
           <nav className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-1">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Documentation</p>
-              {sections.map((s) => (
-                <a
-                  key={s.id}
-                  href={`#${s.id}`}
-                  className="flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground hover:bg-secondary/40"
-                >
-                  <s.icon className="h-3.5 w-3.5 shrink-0" />
-                  {s.label}
-                </a>
-              ))}
+              {sections.map((s) => {
+                const isActive = s.id === activeId;
+                return (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth" });
+                      setActiveId(s.id);
+                    }}
+                    className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] transition-all ${
+                      isActive
+                        ? "font-medium text-foreground bg-accent/10 border-l-2 border-accent rounded-l-none pl-2.5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/45 pl-3"
+                    }`}
+                  >
+                    <s.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-accent" : ""}`} />
+                    {s.label}
+                  </a>
+                );
+              })}
             </div>
           </nav>
 
