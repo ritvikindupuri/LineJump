@@ -1155,6 +1155,11 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                       {signing ? "Approving..." : "Approve"}
                     </Button>
                   </div>
+                  {apiError && (
+                    <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg text-[10.5px] text-red-500 font-mono">
+                      {apiError}
+                    </div>
+                  )}
                 </div>
               )}
 

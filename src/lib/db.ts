@@ -5,6 +5,7 @@ let db: Database.Database | null = null;
 async function getDb(): Promise<Database.Database> {
   if (db) return db;
   db = new Database("linejump.db");
+  db.pragma("busy_timeout = 5000");
   db.exec("PRAGMA journal_mode=WAL");
   db.exec("PRAGMA foreign_keys=ON");
   initSchema(db);
@@ -136,6 +137,11 @@ function initSchema(db: Database.Database): void {
 
   try {
     db.exec("ALTER TABLE manifest_approvals ADD COLUMN key_scheme TEXT NOT NULL DEFAULT 'LineJump HSM Key'");
+  } catch (e) {
+    // Ignore if column already exists
+  }
+  try {
+    db.exec("ALTER TABLE manifest_approvals ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
   } catch (e) {
     // Ignore if column already exists
   }
