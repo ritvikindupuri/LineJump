@@ -294,3 +294,50 @@ export const runAutonomousSecurityAgentFn = createServerFn({ method: "POST" })
       };
     }
   });
+
+export const runAuditStepFn = createServerFn({ method: "POST" })
+  .validator((d: { command: string; manifestJson: string; lastApprovedJson?: string }) => {
+    if (!d.command || !d.manifestJson) throw new Error("command and manifestJson required");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFilePromise = promisify(execFile);
+
+    const tmpDir = path.join(process.cwd(), "scratch");
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+
+    const manifestPath = path.join(tmpDir, `tmp_manifest_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+    fs.writeFileSync(manifestPath, data.manifestJson, "utf8");
+
+    let lastApprovedPath = "None";
+    if (data.lastApprovedJson) {
+      lastApprovedPath = path.join(tmpDir, `tmp_base_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
+      fs.writeFileSync(lastApprovedPath, data.lastApprovedJson, "utf8");
+    }
+
+    try {
+      const args = [];
+      if (data.command === "validate" || data.command === "dlp" || data.command === "threat-model") {
+        args.push(manifestPath);
+      } else if (data.command === "diff") {
+        args.push(lastApprovedPath, manifestPath);
+      }
+      
+      const { stdout, stderr } = await execFilePromise("node", ["cli.js", data.command, ...args], { cwd: process.cwd() });
+      return { stdout: stdout || stderr };
+    } catch (e: any) {
+      return { stdout: e.stdout || e.stderr || e.message };
+    } finally {
+      try {
+        if (fs.existsSync(manifestPath)) fs.unlinkSync(manifestPath);
+        if (lastApprovedPath !== "None" && fs.existsSync(lastApprovedPath)) fs.unlinkSync(lastApprovedPath);
+      } catch {}
+    }
+  });
+

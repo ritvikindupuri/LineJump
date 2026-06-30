@@ -32,7 +32,7 @@ import { shareByEmail, copyShareableLink } from "../lib/share";
 import { evaluateCiCheck, DEFAULT_CI_CONFIG, generateCiCheckMarkdown, type CiCheckResult } from "../lib/ci-check";
 import { useScanStore } from "../hooks/use-scan-store";
 import { fetchMcpManifest } from "../lib/mcp-fetch.functions";
-import { deepScanManifest, runAutonomousSecurityAgentFn, type DeepScanResult, type DeepScanFinding } from "../lib/deep-scan.functions";
+import { deepScanManifest, runAutonomousSecurityAgentFn, runAuditStepFn, type DeepScanResult, type DeepScanFinding } from "../lib/deep-scan.functions";
 
 export const Route = createFileRoute("/app")({
   component: AppPage,
@@ -375,48 +375,59 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
       diffList.push("No approved historical manifests recorded in database. Reviewing full manifest scope.");
     }
 
+    // Step 1: Validate
     currentLogs += `\n[CMD] linejump-engine validate --input=manifest.json\n`;
     setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 400));
-    currentLogs += `[OUT] ✓ Manifest conforms to MCP v1.0 schema specification.\n`;
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 200));
-
-    currentLogs += `\n[CMD] linejump-engine diff --base=sqlite://last_approved --head=manifest.json\n`;
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 450));
-    currentLogs += `[OUT] Mapped ${diffList.length} schema changes:\n`;
-    diffList.forEach(d => {
-      currentLogs += `      - ${d}\n`;
-    });
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 400));
-
-    currentLogs += `\n[CMD] linejump-engine dlp --mode=strict --scan-all\n`;
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 400));
-    currentLogs += `[OUT] Scanning tools and input schema fields for sensitive parameters/PII...\n`;
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 250));
-    currentLogs += `[OUT] Checked ${reportState.bom?.length || 0} tools. DLP scan result: PASSED (0 leaks).\n`;
+    try {
+      const res = await runAuditStepFn({ data: { command: "validate", manifestJson: rawManifest } });
+      currentLogs += `[OUT] ${res.stdout}`;
+    } catch (e: any) {
+      currentLogs += `[OUT] Error running validation: ${e.message || e}\n`;
+    }
     setAgentThinking(currentLogs);
     await new Promise(r => setTimeout(r, 300));
 
-    currentLogs += `\n[CMD] linejump-engine threat-model --analyze-chains\n`;
+    // Step 2: Diff
+    currentLogs += `\n[CMD] linejump-engine diff --base=sqlite://last_approved --head=manifest.json\n`;
     setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 450));
-    currentLogs += `[OUT] Evaluating cross-tool exfiltration chains and outbound network routes...\n`;
-    setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 250));
-
-    const hasEgress = reportState.bom?.some(item => item.externalDomains.length > 0);
-    if (hasEgress) {
-      currentLogs += `[OUT] Warning: outbound egress point detected. Potential data exfiltration vector identified.\n`;
-    } else {
-      currentLogs += `[OUT] Safe: No outbound egress points detected. System network-isolated.\n`;
+    try {
+      const res = await runAuditStepFn({
+        data: {
+          command: "diff",
+          manifestJson: rawManifest,
+          lastApprovedJson: lastApproved?.manifest_json || ""
+        }
+      });
+      currentLogs += `[OUT] ${res.stdout}`;
+    } catch (e: any) {
+      currentLogs += `[OUT] Error running diff: ${e.message || e}\n`;
     }
     setAgentThinking(currentLogs);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 300));
+
+    // Step 3: DLP
+    currentLogs += `\n[CMD] linejump-engine dlp --mode=strict --scan-all\n`;
+    setAgentThinking(currentLogs);
+    try {
+      const res = await runAuditStepFn({ data: { command: "dlp", manifestJson: rawManifest } });
+      currentLogs += `[OUT] ${res.stdout}`;
+    } catch (e: any) {
+      currentLogs += `[OUT] Error running dlp: ${e.message || e}\n`;
+    }
+    setAgentThinking(currentLogs);
+    await new Promise(r => setTimeout(r, 300));
+
+    // Step 4: Threat model
+    currentLogs += `\n[CMD] linejump-engine threat-model --analyze-chains\n`;
+    setAgentThinking(currentLogs);
+    try {
+      const res = await runAuditStepFn({ data: { command: "threat-model", manifestJson: rawManifest } });
+      currentLogs += `[OUT] ${res.stdout}`;
+    } catch (e: any) {
+      currentLogs += `[OUT] Error running threat-model: ${e.message || e}\n`;
+    }
+    setAgentThinking(currentLogs);
+    await new Promise(r => setTimeout(r, 300));
 
     currentLogs += `\n[AGENT] Dispatching results to Gemini safety model for autonomous audit...\n`;
     setAgentThinking(currentLogs);
