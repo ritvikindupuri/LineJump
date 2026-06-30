@@ -249,7 +249,7 @@ Defaults operate dynamically in `src/lib/default-policy.ts`.
 
 ### 6. Drift Governance & AI Audit Console
 - **Drift Detection Heuristics**: Compares active scanned tool schemas and parameters against the organization's signed history in SQLite `manifest_approvals`.
-- **Autonomous Audit Agent**: Integrates a Gemini-powered autonomous security auditor that evaluates structural changes side-by-side for prompt injection vectors or capability escalation, and prints real-time reasoning logs.
+- **Autonomous Audit Agent**: Integrates a local safety model-powered (Llama Guard 3) autonomous security auditor that evaluates structural changes side-by-side for prompt injection vectors or capability escalation, and prints real-time reasoning logs.
 - **Reviewer Verdict Actions**: Supports explicit `approved` and `denied` states:
   - **Approve**: Signs off on the manifest with the agent's proposed key scheme, updates dashboard status to green `Authorized Matches Approval`, and establishes a visual synchronized connection.
   - **Deny**: Rejects changes, stores a `denied` status in the database, sets dashboard status to red `Rejected / Denied`, and breaks the visual sync flow with a red warning link.
