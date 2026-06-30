@@ -318,6 +318,11 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const [reportState, setReportState] = useState(report);
   const [workspaceTab, setWorkspaceTab] = useState("findings");
 
+  // Sync state when report prop updates from a new scan
+  useEffect(() => {
+    setReportState(report);
+  }, [report]);
+
   // Drift Governance approvals lists
   const [lastApproved, setLastApproved] = useState<any | null>(null);
   const [approvalsHistory, setApprovalsHistory] = useState<any[]>([]);
@@ -343,9 +348,10 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     }
   };
 
+  // Re-load approvals when either the server name or raw text content changes
   useEffect(() => {
     loadApprovals();
-  }, [reportState.serverName]);
+  }, [reportState.serverName, rawManifest]);
 
   const handlePolicyChange = (policy: string) => {
     setActivePolicy(policy);
