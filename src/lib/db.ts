@@ -129,9 +129,16 @@ function initSchema(db: Database.Database): void {
       manifest_json TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'approved',
       approved_at TEXT NOT NULL DEFAULT (datetime('now')),
-      approved_by TEXT NOT NULL DEFAULT 'security_admin'
+      approved_by TEXT NOT NULL DEFAULT 'security_admin',
+      key_scheme TEXT NOT NULL DEFAULT 'LineJump HSM Key'
     );
   `);
+
+  try {
+    db.exec("ALTER TABLE manifest_approvals ADD COLUMN key_scheme TEXT NOT NULL DEFAULT 'LineJump HSM Key'");
+  } catch (e) {
+    // Ignore if column already exists
+  }
 }
 
 export async function registerUser(email: string, name: string, password: string): Promise<string> {
@@ -384,10 +391,10 @@ export async function getManifestApprovals(serverName?: string): Promise<any[]> 
   return db.prepare("SELECT * FROM manifest_approvals ORDER BY approved_at DESC").all() as any[];
 }
 
-export async function approveManifest(serverName: string, manifestHash: string, manifestJson: string, approvedBy = "security_admin"): Promise<void> {
+export async function approveManifest(serverName: string, manifestHash: string, manifestJson: string, approvedBy = "security_admin", keyScheme = "LineJump HSM Key"): Promise<void> {
   const db = await getDb();
-  db.prepare("INSERT INTO manifest_approvals (id, server_name, manifest_hash, manifest_json, status, approved_by) VALUES (?, ?, ?, ?, 'approved', ?)")
-    .run(crypto.randomUUID(), serverName, manifestHash, manifestJson, approvedBy);
+  db.prepare("INSERT INTO manifest_approvals (id, server_name, manifest_hash, manifest_json, status, approved_by, key_scheme) VALUES (?, ?, ?, ?, 'approved', ?, ?)")
+    .run(crypto.randomUUID(), serverName, manifestHash, manifestJson, approvedBy, keyScheme);
 }
 
 export async function getLatestApprovedManifest(serverName: string): Promise<any | null> {

@@ -363,7 +363,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     }
   };
 
-  const handleSignManifest = async (reviewerName: string) => {
+  const handleSignManifest = async (reviewerName: string, keyScheme: string) => {
     setSigning(true);
     try {
       const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
@@ -372,7 +372,8 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
           serverName: reportState.serverName,
           manifestHash: clientHash,
           manifestJson: rawManifest,
-          approvedBy: reviewerName || "Security Administrator"
+          approvedBy: reviewerName || "Security Administrator",
+          keyScheme: keyScheme || "LineJump HSM Key"
         }
       });
       await loadApprovals();
@@ -388,7 +389,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     if (!signatureModal) return;
     setSigning(true);
     try {
-      await handleSignManifest(signatureModal.reviewer);
+      await handleSignManifest(signatureModal.reviewer, signatureModal.keyType);
       setSignatureModal(null);
     } catch (err: any) {
       alert(`Signature failed: ${err.message || err}`);
@@ -1149,7 +1150,7 @@ function DiffGovernancePanel({
                     <span className="font-mono font-medium text-muted-foreground">{h.manifest_hash}</span>
                     <Badge className="bg-green-500/10 text-green-500 border-none text-[9px] px-1 py-0 uppercase">Signed</Badge>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Approved by {h.approved_by}</p>
+                  <p className="text-[10px] text-muted-foreground">Approved by {h.approved_by} using <span className="font-semibold text-foreground/80">{h.key_scheme || "LineJump HSM Key"}</span></p>
                 </div>
                 <span className="text-muted-foreground text-[10px]">{new Date(h.approved_at).toLocaleString()}</span>
               </Card>
