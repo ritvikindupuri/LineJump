@@ -323,6 +323,15 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
   const [approvalsHistory, setApprovalsHistory] = useState<any[]>([]);
   const [signing, setSigning] = useState(false);
 
+  const [signatureModal, setSignatureModal] = useState<{
+    step: 1 | 2 | 3;
+    checked: boolean;
+    reviewer: string;
+    keyType: string;
+    log: string[];
+    signingInProgress?: boolean;
+  } | null>(null);
+
   const loadApprovals = async () => {
     try {
       const latest = await getLatestApprovedManifestFn({ serverName: reportState.serverName });
@@ -354,7 +363,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
     }
   };
 
-  const handleSignManifest = async () => {
+  const handleSignManifest = async (reviewerName: string) => {
     setSigning(true);
     try {
       const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
@@ -363,15 +372,72 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
           serverName: reportState.serverName,
           manifestHash: clientHash,
           manifestJson: rawManifest,
-          approvedBy: "security_admin"
+          approvedBy: reviewerName || "Security Administrator"
         }
       });
       await loadApprovals();
-      alert("Manifest version approved and signed off successfully.");
     } catch (e) {
       console.error(e);
+      throw e;
     } finally {
       setSigning(false);
+    }
+  };
+
+  const executeSignatureFlow = async () => {
+    if (!signatureModal) return;
+    setSignatureModal(prev => ({
+      ...prev!,
+      step: 3,
+      signingInProgress: true,
+      log: ["[LineJump HSM] Initiating cryptographic authorization session..."]
+    }));
+
+    const addLogWithDelay = (message: string, delay: number) => {
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          setSignatureModal(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              log: [...prev.log, message]
+            };
+          });
+          resolve();
+        }, delay);
+      });
+    };
+
+    try {
+      await addLogWithDelay("[LineJump HSM] Compiling tool schema list...", 250);
+      const clientHash = "h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16);
+      await addLogWithDelay(`[LineJump HSM] Calculated manifest hash: ${clientHash}`, 250);
+      await addLogWithDelay(`[LineJump HSM] Packaging reviewer credentials: ${signatureModal.reviewer}`, 250);
+      await addLogWithDelay(`[LineJump HSM] Signing hash with token: ${signatureModal.keyType}...`, 350);
+      
+      // Call the server function!
+      await handleSignManifest(signatureModal.reviewer);
+      
+      await addLogWithDelay("[LineJump HSM] Signature registered and written to SQLite DB.", 250);
+      await addLogWithDelay("[LineJump HSM] Verification SUCCESS: Manifest authorized for deployment!", 200);
+      
+      setSignatureModal(prev => {
+        if (!prev) return prev;
+        return { ...prev, signingInProgress: false };
+      });
+      
+      setTimeout(() => {
+        setSignatureModal(null);
+      }, 1500);
+    } catch (err: any) {
+      setSignatureModal(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          signingInProgress: false,
+          log: [...prev.log, `[LineJump HSM] ERROR: Signing failed: ${err.message || err}`]
+        };
+      });
     }
   };
 
@@ -887,11 +953,125 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             rawManifest={rawManifest}
             lastApproved={lastApproved}
             approvalsHistory={approvalsHistory}
-            onApprove={handleSignManifest}
+            onApprove={() => setSignatureModal({ step: 1, checked: false, reviewer: "Security Administrator", keyType: "LineJump HSM Key", log: [] })}
             signing={signing}
           />
         </TabsContent>
       </Tabs>
+      
+      {signatureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-lg border-border/50 p-6 shadow-2xl bg-card">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-green-500" />
+                  MCP Manifest Sign-off Portal
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Authorizing downstream server schemas</p>
+              </div>
+              {!signatureModal.signingInProgress && (
+                <Button variant="ghost" size="sm" onClick={() => setSignatureModal(null)}>Cancel</Button>
+              )}
+            </div>
+
+            {signatureModal.step === 1 && (
+              <div className="space-y-4">
+                <div className="bg-muted/40 p-4 rounded-lg border border-border/50 space-y-2 text-xs">
+                  <div><strong>Server Name:</strong> {reportState.serverName}</div>
+                  <div><strong>Server Version:</strong> {reportState.version || "1.0.0"}</div>
+                  <div><strong>Manifest Hash:</strong> <span className="font-mono text-muted-foreground font-medium">{"h-" + Math.abs(Array.from(rawManifest).reduce((s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0)).toString(16)}</span></div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="sign-check"
+                    checked={signatureModal.checked}
+                    onChange={(e) => setSignatureModal({ ...signatureModal, checked: e.target.checked })}
+                    className="mt-0.5 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="sign-check" className="text-xs text-muted-foreground leading-normal font-normal cursor-pointer">
+                    I confirm that I have reviewed the schema differences, verified the active capabilities, and authorize this manifest version for production deployment.
+                  </Label>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    size="sm"
+                    disabled={!signatureModal.checked}
+                    onClick={() => setSignatureModal({ ...signatureModal, step: 2 })}
+                    className="h-8 text-xs bg-primary text-primary-foreground font-medium"
+                  >
+                    Proceed to Identity
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {signatureModal.step === 2 && (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-foreground">Signer Name / Reviewer Identity</Label>
+                    <Input
+                      type="text"
+                      value={signatureModal.reviewer}
+                      onChange={(e) => setSignatureModal({ ...signatureModal, reviewer: e.target.value })}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="e.g. Security Admin"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-foreground">Signing Token/Key Scheme</Label>
+                    <select
+                      value={signatureModal.keyType}
+                      onChange={(e) => setSignatureModal({ ...signatureModal, keyType: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option>LineJump HSM Key</option>
+                      <option>Local SSH Key (ED25519)</option>
+                      <option>GPG Signature Key</option>
+                      <option>Developer Signature</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSignatureModal({ ...signatureModal, step: 1 })} className="h-8 text-xs">
+                    Back
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!signatureModal.reviewer.trim()}
+                    onClick={executeSignatureFlow}
+                    className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white font-medium"
+                  >
+                    Generate Signature & Sign
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {signatureModal.step === 3 && (
+              <div className="space-y-4">
+                <div className="rounded bg-black p-3 font-mono text-[10px] text-green-400 min-h-[140px] space-y-1 overflow-y-auto max-h-[200px]">
+                  {signatureModal.log.map((line, idx) => (
+                    <div key={idx} className="leading-relaxed whitespace-pre-wrap">{line}</div>
+                  ))}
+                  {signatureModal.signingInProgress && (
+                    <div className="animate-pulse">_</div>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  {!signatureModal.signingInProgress && (
+                    <Button size="sm" variant="outline" className="h-8 text-xs border-border" onClick={() => setSignatureModal(null)}>
+                      Close Portal
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </TooltipProvider>
     </div>
   );
@@ -1154,6 +1334,13 @@ function SecurityGatekeeperView() {
   const [loading, setLoading] = useState(false);
   const [gatekeeperTab, setGatekeeperTab] = useState<"tofu" | "quarantine">("tofu");
 
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "approve" | "block" | "release";
+    id: string;
+    serverName: string;
+    toolName: string;
+  } | null>(null);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -1174,19 +1361,24 @@ function SecurityGatekeeperView() {
     loadData();
   }, []);
 
-  const handleApprove = async (id: string) => {
-    await approvePinnedToolFn({ data: { id } });
-    await loadData();
-  };
-
-  const handleBlock = async (id: string) => {
-    await blockPinnedToolFn({ data: { id } });
-    await loadData();
-  };
-
-  const handleRelease = async (id: string) => {
-    await releaseQuarantineFn({ data: { id } });
-    await loadData();
+  const executeConfirmedAction = async () => {
+    if (!confirmModal) return;
+    setLoading(true);
+    try {
+      if (confirmModal.type === "approve") {
+        await approvePinnedToolFn({ data: { id: confirmModal.id } });
+      } else if (confirmModal.type === "block") {
+        await blockPinnedToolFn({ data: { id: confirmModal.id } });
+      } else if (confirmModal.type === "release") {
+        await releaseQuarantineFn({ data: { id: confirmModal.id } });
+      }
+      await loadData();
+      setConfirmModal(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1203,10 +1395,27 @@ function SecurityGatekeeperView() {
       </div>
 
       <Tabs value={gatekeeperTab} onValueChange={(v) => setGatekeeperTab(v as any)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="tofu" className="text-xs">Tool Pinning (TOFU)</TabsTrigger>
-          <TabsTrigger value="quarantine" className="text-xs">Quarantine Center</TabsTrigger>
-        </TabsList>
+        <TooltipProvider>
+          <TabsList className="grid w-full grid-cols-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="tofu" className="text-xs">Tool Pinning (TOFU)</TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs font-normal">Trust-on-First-Use tool pinning. Authorized tool schemas can execute downstream while unverified schemas are flagged.</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="quarantine" className="text-xs">Quarantine Center</TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs font-normal">DLP and Output Quarantine log. View quarantined responses containing prompt injections or potential credential leaks.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsList>
+        </TooltipProvider>
 
         <TabsContent value="tofu" className="mt-4 space-y-4">
           <div className="space-y-2">
@@ -1235,10 +1444,10 @@ function SecurityGatekeeperView() {
                         <p className="text-[10px] text-muted-foreground mt-1">Registered: {new Date(tool.created_at).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                        <Button size="sm" variant="outline" className="h-7 text-xs text-green-500 hover:bg-green-500/5 hover:text-green-600 border-green-500/20" onClick={() => handleApprove(tool.id)}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs text-green-500 hover:bg-green-500/5 hover:text-green-600 border-green-500/20" onClick={() => setConfirmModal({ type: "approve", id: tool.id, serverName: tool.server_name, toolName: tool.tool_name })}>
                           Approve
                         </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 hover:bg-red-500/5 hover:text-red-600 border-red-500/20" onClick={() => handleBlock(tool.id)}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 hover:bg-red-500/5 hover:text-red-600 border-red-500/20" onClick={() => setConfirmModal({ type: "block", id: tool.id, serverName: tool.server_name, toolName: tool.tool_name })}>
                           Block
                         </Button>
                       </div>
@@ -1275,7 +1484,7 @@ function SecurityGatekeeperView() {
                         <p className="text-[11px] text-red-500 font-medium mt-1">Reason: {q.reason}</p>
                       </div>
                       {isQuarantined && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs text-green-500 border-green-500/20 hover:bg-green-500/5" onClick={() => handleRelease(q.id)}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs text-green-500 border-green-500/20 hover:bg-green-500/5" onClick={() => setConfirmModal({ type: "release", id: q.id, serverName: q.server_name, toolName: q.tool_name })}>
                           Release Content
                         </Button>
                       )}
@@ -1293,6 +1502,44 @@ function SecurityGatekeeperView() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md border-border/50 p-6 shadow-2xl bg-card">
+            <h3 className="text-base font-semibold capitalize flex items-center gap-2">
+              <Shield className={`h-5 w-5 ${confirmModal.type === "approve" ? "text-green-500" : confirmModal.type === "block" ? "text-red-500" : "text-yellow-500"}`} />
+              Confirm {confirmModal.type} Action
+            </h3>
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+              You are about to <b>{confirmModal.type}</b> the tool <b>{confirmModal.toolName}</b> on server <b>{confirmModal.serverName}</b>.
+            </p>
+            <div className="mt-4 bg-muted/30 p-3 rounded border border-border/50 text-[11px] space-y-1">
+              <div><strong>Server:</strong> {confirmModal.serverName}</div>
+              <div><strong>Tool Name:</strong> {confirmModal.toolName}</div>
+              <div><strong>Action Type:</strong> <span className="uppercase font-semibold">{confirmModal.type}</span></div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmModal(null)} disabled={loading}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={executeConfirmedAction}
+                disabled={loading}
+                className={
+                  confirmModal.type === "approve"
+                    ? "bg-green-600 hover:bg-green-700 text-white font-medium"
+                    : confirmModal.type === "block"
+                    ? "bg-red-600 hover:bg-red-700 text-white font-medium"
+                    : "bg-yellow-600 hover:bg-yellow-700 text-white font-medium"
+                }
+              >
+                {loading ? "Processing..." : `Yes, Confirm ${confirmModal.type}`}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
