@@ -63,6 +63,39 @@ function id() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function getDetailedFindingTemplate(category: string, title: string) {
+  const cat = (category || "").toLowerCase();
+  const t = (title || "").toLowerCase();
+
+  if (cat.includes("injection") || cat.includes("prompt") || t.includes("injection") || t.includes("prompt")) {
+    return `* **Description**: The tool description contains directive language that attempts to override or hijack the host LLM client's system state.
+* **Importance**: Prompt injections can force the client to call dangerous actions, expose local environment credentials, or leak sensitive prompt histories.
+* **Remediation**: Rephrase the tool description to be purely functional and informative. Avoid imperative instructions like "you must" or "always invoke".`;
+  }
+
+  if (cat.includes("exec") || cat.includes("shell") || cat.includes("command") || t.includes("exec") || t.includes("shell") || t.includes("command")) {
+    return `* **Description**: Direct exposure of operating system shell command execution capability.
+* **Importance**: Running raw terminal instructions allows the LLM client (or an attacker injection) to execute arbitrary commands on the host OS, leading to complete machine takeover.
+* **Remediation**: Predefine and lock execution paths. Restrict parameter inputs to strict enum options instead of exposing raw shells.`;
+  }
+
+  if (cat.includes("file") || cat.includes("read") || cat.includes("write") || t.includes("file") || t.includes("read") || t.includes("write")) {
+    return `* **Description**: Tool exposed with broad filesystem read or write privileges.
+* **Importance**: Allows the model to inspect private directories, access SSH private keys, read database configurations, or overwrite critical system files.
+* **Remediation**: Restrict tool path parameters to a specific subfolder. Perform validation to ensure parameter strings do not contain relative traversal characters (../).`;
+  }
+
+  if (cat.includes("credential") || cat.includes("secret") || cat.includes("token") || t.includes("credential") || t.includes("secret") || t.includes("token")) {
+    return `* **Description**: Potential exposure or leakage of API keys, password logs, or authentication tokens.
+* **Importance**: Leads to credential harvesting, allowing unauthorized access to integrated cloud accounts and private storage.
+* **Remediation**: Use local environment variables on the server-side instead of requesting the LLM to pass credential parameters.`;
+  }
+
+  return `* **Description**: The local safety model flagged a potential policy violation or capability mismatch in this tool's manifest definition.
+* **Importance**: Subtle semantic anomalies or descriptive instruction prompts can lead to unexpected downstream tool execution risks.
+* **Remediation**: Review the tool's schemas and descriptions to verify they follow least-privilege access principles.`;
+}
+
 export const deepScanManifest = createServerFn({ method: "POST" })
   .validator((d: unknown) => {
     const input = d as DeepScanInput;
@@ -99,12 +132,28 @@ export const deepScanManifest = createServerFn({ method: "POST" })
       const findingsList = parsed.findings || [];
       const hasFindings = findingsList.length > 0;
 
+      const mappedFindings = findingsList.map((f: any) => {
+        let detailText = f.detail || "";
+        if (detailText.trim() === "" || detailText.length < 15) {
+          detailText = getDetailedFindingTemplate(f.category || "Semantic", f.title || "Potential Risk");
+        }
+        return {
+          severity: validateSeverity(f.severity),
+          category: f.category || "Semantic",
+          title: f.title || "Potential Risk",
+          detail: detailText,
+          toolName: f.toolName,
+          evidence: f.evidence,
+          llmReasoning: f.llmReasoning || "",
+        };
+      });
+
       let analysisText = parsed.analysis;
       if (!analysisText) {
         if (hasFindings) {
           analysisText = `### Local AI Security Review\n\n* **Verdict**: **UNSAFE (REVISE RECOMMENDED)**\n* **Summary**: Flagged ${findingsList.length} potential security concern(s) in this manifest.\n\n`;
-          findingsList.forEach((f: any, i: number) => {
-            analysisText += `* **Concern ${i + 1}**: **${f.title || "Potential Risk"}**\n  ${f.detail || ""}\n\n`;
+          mappedFindings.forEach((f: any, i: number) => {
+            analysisText += `* **Concern ${i + 1}**: **${f.title}**\n${f.detail}\n\n`;
           });
         } else {
           analysisText = `### Local AI Security Review\n\n* **Scan Attestation**: Clean audit. No prompt injection vectors, capability mismatches, or malicious obfuscation patterns were detected.\n* **Permissions Check**: Tools are correctly scoped for their declared descriptions.\n* **Recommendation**: Safe for deployment.`;
@@ -118,7 +167,7 @@ export const deepScanManifest = createServerFn({ method: "POST" })
 
       if (hasFindings) {
         let penalty = 0;
-        findingsList.forEach((f: any) => {
+        mappedFindings.forEach((f: any) => {
           const sev = (f.severity || "medium").toLowerCase();
           if (sev === "critical") penalty += 50;
           else if (sev === "high") penalty += 30;
@@ -129,15 +178,7 @@ export const deepScanManifest = createServerFn({ method: "POST" })
       }
 
       return {
-        findings: findingsList.map((f: any) => ({
-          severity: validateSeverity(f.severity),
-          category: f.category || "Semantic",
-          title: f.title || "Potential Risk",
-          detail: f.detail || "",
-          toolName: f.toolName,
-          evidence: f.evidence,
-          llmReasoning: f.llmReasoning || "",
-        })),
+        findings: mappedFindings,
         llmScore: Math.max(0, Math.min(100, scoreVal)),
         analysis: analysisText,
         model,
