@@ -1093,6 +1093,64 @@ function DiffGovernancePanel({
           )}
         </div>
 
+        {/* Visual Drift Sync Flow Diagram */}
+        <div className="rounded-xl border border-border/30 bg-muted/20 p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center">
+          {/* Node 1: Incoming Schema */}
+          <div className="flex-1 p-3 rounded-lg border border-border/60 bg-background/50 text-xs w-full max-w-[220px]">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block mb-1.5">Scanned Schema</span>
+            <div className="font-mono font-bold text-foreground text-[12px] truncate">{currentHash}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Tools: {report.bom?.length || 0}</div>
+          </div>
+
+          {/* Connection sync logic */}
+          <div className="flex flex-col items-center shrink-0 w-full md:w-auto">
+            {isMatch ? (
+              <>
+                <span className="text-[9px] font-mono uppercase tracking-widest text-green-500 font-semibold mb-1">synchronized</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-[2px] w-12 bg-green-500" />
+                  <Check className="h-4.5 w-4.5 text-green-500 bg-green-500/15 rounded-full p-0.5" />
+                  <div className="h-[2px] w-12 bg-green-500" />
+                </div>
+              </>
+            ) : lastApproved ? (
+              <>
+                <span className="text-[9px] font-mono uppercase tracking-widest text-yellow-500 font-semibold mb-1">drift detected</span>
+                <div className="flex items-center gap-1.5 animate-pulse">
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-yellow-500" />
+                  <AlertTriangle className="h-4.5 w-4.5 text-yellow-500 bg-yellow-500/15 rounded-full p-0.5" />
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-yellow-500" />
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground font-semibold mb-1">not authorized</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-muted-foreground/30" />
+                  <Shield className="h-4.5 w-4.5 text-muted-foreground bg-muted p-0.5 rounded-full" />
+                  <div className="h-[2px] w-10 border-dashed border-t-2 border-muted-foreground/30" />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Node 2: Database Approved Signature */}
+          <div className="flex-1 p-3 rounded-lg border border-border/60 bg-background/50 text-xs w-full max-w-[220px]">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block mb-1.5">Approved Signature</span>
+            {lastApproved ? (
+              <>
+                <div className="font-mono font-bold text-foreground text-[12px] truncate">{lastApproved.manifest_hash}</div>
+                <div className="text-[10px] text-muted-foreground mt-1 truncate">By: {lastApproved.approved_by}</div>
+              </>
+            ) : (
+              <>
+                <div className="font-mono font-bold text-muted-foreground text-[12px]">None</div>
+                <div className="text-[10px] text-muted-foreground mt-1">No signed manifests</div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Diff Result List */}
         {lastApproved && !isMatch && diffs.length > 0 && (
           <div className="space-y-2 bg-muted/40 p-3 rounded-lg border border-border/30">
