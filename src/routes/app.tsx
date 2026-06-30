@@ -239,6 +239,48 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+function parseInlineBold(text: string) {
+  const parts = text.split("**");
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return <strong key={i} className="text-foreground font-semibold">{part}</strong>;
+    }
+    return part;
+  });
+}
+
+function renderMarkdown(text: string) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-1.5 text-[11px] leading-normal text-muted-foreground">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("### ")) {
+          return (
+            <h4 key={idx} className="text-[12.5px] font-bold text-foreground mt-3 mb-1 block">
+              {trimmed.substring(4)}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith("* ")) {
+          const bulletContent = trimmed.substring(2);
+          return (
+            <div key={idx} className="flex gap-2 items-start pl-2 my-1">
+              <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+              <span className="text-muted-foreground/90">{parseInlineBold(bulletContent)}</span>
+            </div>
+          );
+        }
+        if (trimmed === "") {
+          return <div key={idx} className="h-1" />;
+        }
+        return <p key={idx} className="my-0.5">{parseInlineBold(trimmed)}</p>;
+      })}
+    </div>
+  );
+}
+
 function FindingCard({ finding }: { finding: Finding }) {
   return (
     <motion.div
@@ -772,7 +814,7 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
             </p>
           ) : deepResult.llmScore < 0 ? (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">{deepResult.analysis}</p>
+              {renderMarkdown(deepResult.analysis)}
             </div>
           ) : (
             <div className="space-y-4">
@@ -787,9 +829,9 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   <span>Tokens: {deepResult.tokenUsage.input} in / {deepResult.tokenUsage.output} out</span>
                 </div>
               </div>
-              <p className="text-xs leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-3">
-                {deepResult.analysis}
-              </p>
+              <div className="bg-muted/30 rounded-md p-3">
+                {renderMarkdown(deepResult.analysis)}
+              </div>
             </div>
           )}
         </div>
@@ -1092,17 +1134,17 @@ function ReportView({ report, rawManifest, onBack }: { report: ScanReport; rawMa
                   {agentResult.safetyDecision === "safe" ? (
                     <div className="bg-green-500/10 border border-green-500/20 p-3.5 rounded-lg flex items-start gap-2.5 text-xs text-green-500">
                       <CheckCircle className="h-4.5 w-4.5 shrink-0 text-green-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <span className="font-bold block">Agent Audit Verdict: SAFE TO AUTHORIZE</span>
-                        <p className="text-muted-foreground text-[11px] mt-1">{agentResult.explanation}</p>
+                        <div className="text-[11px] mt-1">{renderMarkdown(agentResult.explanation)}</div>
                       </div>
                     </div>
                   ) : (
                     <div className="bg-red-500/10 border border-red-500/20 p-3.5 rounded-lg flex items-start gap-2.5 text-xs text-red-500">
                       <ShieldAlert className="h-4.5 w-4.5 shrink-0 text-red-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <span className="font-bold block">Agent Audit Verdict: BLOCK & REJECT (UNSAFE)</span>
-                        <p className="text-muted-foreground text-[11px] mt-1">{agentResult.explanation}</p>
+                        <div className="text-[11px] mt-1">{renderMarkdown(agentResult.explanation)}</div>
                       </div>
                     </div>
                   )}
