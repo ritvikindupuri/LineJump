@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -1562,9 +1562,16 @@ function AppPage() {
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/30 pb-3 gap-3">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-foreground">Console Control</h1>
-              <p className="text-xs text-muted-foreground">Manage audits, live monitoring, and security exceptions.</p>
+            <div className="flex items-center gap-3.5">
+              <Link to="/">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border border-border/60 hover:bg-secondary" title="Back to Home">
+                  <ArrowLeft className="h-4.5 w-4.5 text-muted-foreground hover:text-foreground" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-foreground">Console Control</h1>
+                <p className="text-xs text-muted-foreground">Manage audits, live monitoring, and security exceptions.</p>
+              </div>
             </div>
             <TooltipProvider>
               <TabsList className="h-9 self-start sm:self-auto">
