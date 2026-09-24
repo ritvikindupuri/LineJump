@@ -4,4 +4,6 @@ dist
 *.md
 .DS_Store
 linejump.db
-.env.local
+.env
+.env.*
+!.env.example
